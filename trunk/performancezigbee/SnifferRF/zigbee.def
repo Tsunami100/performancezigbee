@@ -1,0 +1,84 @@
+//*********************************************************************
+//*                                                                    
+//* Software License Agreement                                         
+//*                                                                    
+//* The software supplied herewith by Microchip Technology Incorporated
+//* (the “Company”) for its PICmicro® Microcontroller is intended and  
+//* supplied to you, the Company’s customer, for use solely and        
+//* exclusively on Microchip PICmicro Microcontroller products. The    
+//* software is owned by the Company and/or its supplier, and is       
+//* protected under applicable copyright laws. All rights are reserved.
+//* Any use in violation of the foregoing restrictions may subject the 
+//* user to criminal sanctions under applicable laws, as well as to    
+//* civil liability for the breach of the terms and conditions of this 
+//* license.                                                           
+//*                                                                    
+//* THIS SOFTWARE IS PROVIDED IN AN “AS IS” CONDITION. NO WARRANTIES,  
+//* WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED  
+//* TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A        
+//* PARTICULAR PURPOSE APPLY TO THIS SOFTWARE. THE COMPANY SHALL NOT,  
+//* IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL OR         
+//* CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.                  
+//*                                                                    
+//*********************************************************************
+
+// Created by ZENA(TM), 1/27/2006, 11:45:43
+
+#ifndef _ZIGBEE_DEF
+#define _ZIGBEE_DEF
+#define MAC_LONG_ADDR_BYTE7 0x00
+#define MAC_LONG_ADDR_BYTE6 0x04
+#define MAC_LONG_ADDR_BYTE5 0xA3
+#define MAC_LONG_ADDR_BYTE4 0x00
+#define MAC_LONG_ADDR_BYTE3 0x00
+#define MAC_LONG_ADDR_BYTE2 0x00
+#define MAC_LONG_ADDR_BYTE1 0x00
+#define MAC_LONG_ADDR_BYTE0 0x64
+#define I_AM_END_DEVICE
+#define I_AM_RFD
+#define INCLUDE_ED_SCAN
+#define INCLUDE_ACTIVE_SCAN
+#define MY_CAPABILITY_INFO 0x80
+#define MAX_APL_FRAMES 4
+#define MAX_APS_ACK_FRAMES 4
+#define MAX_APS_ADDRESSES 0
+//#define NUM_BUFFERED_INDIRECT_MESSAGES 0
+#define NUM_BUFFERED_INDIRECT_MESSAGES 4
+#define MAX_NEIGHBORS 5
+#define NUM_BUFFERED_BROADCAST_MESSAGES 0
+#define NUM_BUFFERED_ROUTING_MESSAGES 0
+#define MINIMUM_JOIN_LQI 48
+#define RX_BUFFER_SIZE 256
+#define RX_BUFFER_LOCATION 0xa00
+#define MAC_PIB_macBeaconOrder 15
+#define MAC_PIB_macSuperframeOrder 15
+#define IEEE_COMPLY
+#define MAC_PIB_macBattLifeExt FALSE
+#define RF_CHIP CC2420
+#define MAC_PIB_macAckWaitDuration (ONE_SECOND)
+#define FREQUENCY_BAND FB_2400GHz
+#define PHY_CSn LATC0
+#define PHY_CSn_TRIS TRISC0
+#define PHY_FIFO RB0
+#define PHY_FIFO_TRIS TRISB0
+#define PHY_FIFOP RB3
+#define PHY_FIFOP_TRIS TRISB3
+#define PHY_RESETn LATC2
+#define PHY_RESETn_TRIS TRISC2
+#define PHY_SFD RB2
+#define PHY_SFD_TRIS TRISB2
+#define PHY_VREG_EN LATC1
+#define PHY_VREG_EN_TRIS TRISC1
+#define PA_LEVEL 0xEF  // -7 dBm (12.5 mA)
+#define ALLOWED_CHANNELS 0x1000	//0x07fff800
+#define CLOCK_FREQ 16000000
+#define BAUD_RATE 19200
+#define HEAP_LOCATION 0x0100
+#define MAX_HEAP_SIZE 2048
+#define NUM_USER_ENDPOINTS 1
+#define EP_LIGHT 8
+#define EP_PERFORMANCE 7
+#define MY_MAX_INPUT_CLUSTERS 1
+#define MY_MAX_OUTPUT_CLUSTERS 1
+#include "C:\MpZBee\Performance\ZigBeeStack\zProfilePerfomance.h"
+#endif
