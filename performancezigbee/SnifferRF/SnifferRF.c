@@ -1,94 +1,3 @@
-/*
-    Microchip ZigBee Stack
-
-    Demo RFD
-
-    This demonstration shows how a ZigBee RFD can be set up.  This demo allows
-    the PICDEM Z Demostration Board to act as either a "Switching Load Controller"
-    (e.g. a light) or a "Switching Remote Control" (e.g. a switch) as defined by
-    the Home Controls, Lighting profile.  It is designed to interact with a
-    second PICDEM Z programmed with the Demo Coordinator project.
-
-    To give the PICDEM Z "switch" capability, uncomment the I_AM_SWITCH definition
-    below.  To give the PICDEM Z "light" capability, uncomment the I_AM_LIGHT
-    definition below.  The PICDEM Z may have both capabilities enabled.  Be sure
-    that the corresponding Demo Coordinator device is programmed with complementary
-    capabilities.  NOTE - for simplicity, the ZigBee simple descriptors for this
-    demonstration are fixed.
-
-    If this node is configured as a "switch", it can discover the network address
-    of the "light" using two methods.  If the USE_BINDINGS definition is
-    uncommented below, then End Device Binding must be performed between the
-    "switch" and the "light" before messages can be sent and received successfully.
-    If USE_BINDINGS is commented out, then the node will default to the probable
-    network address of the other node, and messages may be able to be sent
-    immediately.  However, the node will also be capable of performing Device
-    Discovery to discover the actual network address of the other node, in case
-    the network was formed with alternate short address assignments.  NOTE: The
-    USE_BINDINGS definition must be the same in both the RFD and the ZigBee
-    Coordinator nodes.
-
-    Switch functionality is as follows:
-        RB4, I_AM_SWITCH defined, sends a "toggle" message to the other node's "light"
-        RB4, I_AM_SWITCH not defined, no effect
-        RB5, USE_BINDINGS defined, sends an End Device Bind request
-        RB5, USE_BINDINGS undefined, sends a NWK_ADDR_req for the MAC address specified
-
-    End Device Binding
-    ------------------
-    If the USE_BINDINGS definition is uncommented, the "switch" will send an
-    APS indirect message to toggle the "light".  In order for the message to
-    reach its final destination, a binding must be created between the "switch"
-    and the "light".  To do this, press RB5 on one PICDEM Z, and then press RB5
-    on the other PICDEM Z within 5 seconds.  A message will be displayed indicating
-    if binding was successful or not.  Note that End Device Binding is a toggle
-    function.  Performing the operation again will unbind the nodes, and messages
-    will not reach their final destination.
-
-    Device Discovery
-    ----------------
-    If the USE_BINDINGS definition is not uncommented, pressing RB5 will send a
-    broadcast NWK_ADDR_req message.  The NWK_ADDR_req message contains the MAC
-    address of the desired node.  Be sure this address matches the address
-    contained in the other node's zigbee.def file.
-
-    NOTE: To speed network formation, ALLOWED_CHANNELS has been set to
-    channel 12 only.
-
- *********************************************************************
- * FileName:        RFD.c
- * Dependencies:
- * Processor:       PIC18F
- * Complier:        MCC18 v3.00 or higher
- * Company:         Microchip Technology, Inc.
- *
- * Software License Agreement
- *
- * The software supplied herewith by Microchip Technology Incorporated
- * (the “Company”) for its PICmicro® Microcontroller is intended and
- * supplied to you, the Company’s customer, for use solely and
- * exclusively on Microchip PICmicro Microcontroller products. The
- * software is owned by the Company and/or its supplier, and is
- * protected under applicable copyright laws. All rights are reserved.
- * Any use in violation of the foregoing restrictions may subject the
- * user to criminal sanctions under applicable laws, as well as to
- * civil liability for the breach of the terms and conditions of this
- * license.
- *
- * THIS SOFTWARE IS PROVIDED IN AN “AS IS” CONDITION. NO WARRANTIES,
- * WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED
- * TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- * PARTICULAR PURPOSE APPLY TO THIS SOFTWARE. THE COMPANY SHALL NOT,
- * IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL OR
- * CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
- *
- *
- * Author               Date    Comment
- *~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * DF/KO                01/09/06 Microchip ZigBee Stack v1.0-3.5
- ********************************************************************/
-
-
 //******************************************************************************
 // Header Files
 //******************************************************************************
@@ -192,6 +101,7 @@ SHORT_ADDR          destinationAddress;
 NETWORK_DESCRIPTOR  *NetworkDescriptor;
 
 TICK                lastTestePerformance;
+TICK                firstTick;
 
 BYTE sinal;
 
@@ -223,8 +133,6 @@ void main(void)
     ConsoleInit();
 
     ConsolePutROMString( (ROM char *)"\r\n\r\n\r\n*************************************\r\n" );
-    ConsolePutROMString( (ROM char *)"Microchip ZigBee(TM) Stack - v1.0-3.5\r\n\r\n" );
-    ConsolePutROMString( (ROM char *)"ZigBee RFD\r\n\r\n" );
     ConsolePutROMString( (ROM char *)"Programa Sniffer RF para rede ZigBee.\r\n\r\n" );
 
     // Initialize the hardware - must be done before initializing ZigBee.
@@ -254,10 +162,11 @@ void main(void)
 	phyPIB.phyCurrentChannel = 12;
 
 
-		ConsolePutROMString( (ROM char *)"Iniciando no canal: " );
+		ConsolePutROMString( (ROM char *)"Canal " );
 		PrintChar( phyPIB.phyCurrentChannel  );
 		ConsolePutROMString( (ROM char *)"\r\n" );
 	
+	firstTick = TickGet();
 
 	MACEnable();
 
@@ -272,24 +181,27 @@ void main(void)
         //sinal = SPIGet();
 		//PrintChar( sinal );
     PHY_CSn_1();
-
-    /* wait for the part to enter RX mode */
-    {
-        TICK t,T2;
-        t = TickGet();
-        while(1)
-        {
-            T2 = TickGet();
-            if(TickGetDiff(T2,t) > SYMBOLS_TO_TICKS(12))
-            {
-                break;
-            }
-        }
-    }
+//
+//    /* wait for the part to enter RX mode */
+//    {
+//        TICK t,T2;
+//        t = TickGet();
+//        while(1)
+//        {
+//            T2 = TickGet();
+//            if(TickGetDiff(T2,t) > SYMBOLS_TO_TICKS(12))
+//            {
+//                break;
+//            }
+//        }
+//    }
 
     while (1)
     {
+        TICK t,T2;
         CLRWDT();
+
+        t = TickGet();
 
 		BIND_INDICATION ^= 1;
 
@@ -308,51 +220,66 @@ void main(void)
 		//PrintChar( sinal );
 
         SPIPut(STROBE_SNOP);
+        SPIPut(STROBE_SNOP);
         sinal = SPIGet();
 
 //		sinal = CC2420GetStatus();
 		//PrintChar( sinal );
         // If transmission was started, break out of this loop.
-        if ( sinal & 0x08 )
-        {
-			ConsolePutROMString( (ROM char *)"_" );
-        }
-		else
-		{
-			MESSAGE_INDICATION ^= 1;
-
-			ConsolePutROMString( (ROM char *)"||" );
-
-
-		}
-
+//        if ( sinal & 0x08 )
+//        {
+//			MESSAGE_INDICATION = 0;
+////			ConsolePutROMString( (ROM char *)"_" );
+//        }
+//		else
+//		{
+//			MESSAGE_INDICATION = 1;
+////			ConsolePutROMString( (ROM char *)"DATA:" );
+//		}
+//
 		if ( sinal & 0x02 )
 		{
+	        TICK t,d;
 			BYTE RSSI;
 
-        	PHY_CSn_1();
+    	    PHY_CSn_1();
             PHY_CSn_0();
             SPIPut(CMD_READ | REG_RSSI);
             SPIGet();   //don't care about this value
             RSSI = SPIGet() +128;   //this is what we are looking for
             PHY_CSn_1();
 
+    	    t = TickGet();
+			d.Val = TickGetDiff(t,firstTick);
+
+			MESSAGE_INDICATION ^= 1;
+
+			ConsolePutROMString( (ROM char *)"DATA:" );
+
+			PrintChar( d.byte.b3 );
+			PrintChar( d.byte.b2 );
+			PrintChar( d.byte.b1 );
+			PrintChar( d.byte.b0 );
+
+			ConsolePutROMString( (ROM char *)":" );
 			PrintChar( RSSI );
-            PHY_CSn_0();
+			ConsolePutROMString( (ROM char *)"\r\n" );
 		}
+		else
+		{
+	        PHY_CSn_1();
+		}
+	    //ConsolePutROMString( (ROM char *)"_" );
 
 //		ConsolePutROMString( (ROM char *)"" );
 
-        PHY_CSn_1();
 
     /* wait for the part to enter RX mode */
     {
-        TICK t,T2;
-        t = TickGet();
         while(1)
         {
             T2 = TickGet();
-            if(TickGetDiff(T2,t) > SYMBOLS_TO_TICKS(1))
+            if(TickGetDiff(T2,t) > SYMBOLS_TO_TICKS(12))
             {
                 break;
             }
