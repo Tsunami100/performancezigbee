@@ -33,7 +33,7 @@
 #define MAC_LONG_ADDR_BYTE3 0x00
 #define MAC_LONG_ADDR_BYTE2 0x00
 #define MAC_LONG_ADDR_BYTE1 0x00
-#define MAC_LONG_ADDR_BYTE0 0x65
+#define MAC_LONG_ADDR_BYTE0 0x64
 #define I_AM_END_DEVICE
 #define I_AM_RFD
 #define INCLUDE_ED_SCAN
@@ -42,7 +42,8 @@
 #define MAX_APL_FRAMES 4
 #define MAX_APS_ACK_FRAMES 4
 #define MAX_APS_ADDRESSES 0
-#define NUM_BUFFERED_INDIRECT_MESSAGES 0
+//#define NUM_BUFFERED_INDIRECT_MESSAGES 0
+#define NUM_BUFFERED_INDIRECT_MESSAGES 4
 #define MAX_NEIGHBORS 5
 #define NUM_BUFFERED_BROADCAST_MESSAGES 0
 #define NUM_BUFFERED_ROUTING_MESSAGES 0
@@ -79,5 +80,5 @@
 #define EP_PERFORMANCE 7
 #define MY_MAX_INPUT_CLUSTERS 1
 #define MY_MAX_OUTPUT_CLUSTERS 1
-#include "C:\MpZBee\ZigBeeStack\zProfilePerfomance.h"
+#include "C:\MpZBee\Performance\ZigBeeStack\zProfilePerfomance.h"
 #endif
