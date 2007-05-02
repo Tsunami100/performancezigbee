@@ -4481,6 +4481,8 @@ void Prepare_MCPS_DATA_request( WORD macDestAddressVal, BYTE *msduHandle )
     if (macDestAddressVal != 0xFFFF)
     {
         params.MCPS_DATA_request.TxOptions.bits.acknowledged_transmission = 1;
+// AQUI MUDA SÓ NO DATA REQUEST
+//params.MCPS_DATA_request.TxOptions.bits.acknowledged_transmission = 0;
         if (NWKLookupNodeByShortAddrVal( macDestAddressVal ) != INVALID_NEIGHBOR_KEY)
         {
             if (!currentNeighborRecord.deviceInfo.bits.RxOnWhenIdle)
