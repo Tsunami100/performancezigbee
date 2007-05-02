@@ -1226,6 +1226,7 @@ ProcessACKPacket:
                                                 /* the last entry is now null because we removed one */
                                                 macIndirectBuffers[i].buffer = NULL;
 
+												// problema de ack nao esta aqui
                                                 if (TxBuffer[0] & 0x20)   //(TxBuffer[TxHeader]&0x20)
                                                 {
                                                     /* ACK transmission requested */
@@ -1406,6 +1407,7 @@ MCPS_DATA_request_label_skip_init:
                 if(params.MCPS_DATA_request.TxOptions.bits.acknowledged_transmission)
                 {
                     /* ACK transmission requested */
+// aqui solicita o ack na camada fisica
                     TxBuffer[TxHeader]|=0x20;
                     // macTasksPending.bits.packetPendingAck - this bit is set only if it is actually going out
                 }
@@ -2155,6 +2157,13 @@ MLME_SCAN_request_INVALID_PARAMETER:
 static void TransmitIt(void)
 {
     BYTE NB,BE,v,i;
+
+	/*
+	 * Start the backoff value
+	 */
+	
+    macPIB.macMaxCSMABackoffs = 4;
+    macPIB.macMinBE = 0;
 
     NB = 0;
     BE = macPIB.macMinBE;
