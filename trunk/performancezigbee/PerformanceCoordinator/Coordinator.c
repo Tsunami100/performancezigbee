@@ -509,6 +509,10 @@ void main(void)
                             	PrintChar( params.APSDE_DATA_indication.asduLength );
 							    ConsolePutROMString( (ROM char *)" bytes para carregar...\r\n\r\n" );
                             } // frame type
+                            if ((frameHeader & APL_FRAME_TYPE_MASK) == APL_FRAME_TYPE_MSG)
+                            {
+                                MESSAGE_INDICATION ^= 1;
+                            } // frame type
                             break;
                         default:
                             // If the command type was something that requested an acknowledge, we could send back
@@ -543,6 +547,41 @@ void main(void)
                         // Place all processes that can send messages here.  Be sure to call
                         // ZigBeeBlockTx() when currentPrimitive is set to APSDE_DATA_request.
                         // ************************************************************************
+
+						/*
+						 * Send a broadcast message to start the test
+						 */
+
+						if (myStatusFlags.bits.bBindSwitchToggled)
+						{
+							myStatusFlags.bits.bBindSwitchToggled = FALSE;
+
+                            TxBuffer[TxData++] = APL_FRAME_TYPE_KVP | 1;    // KVP, 1 transaction
+                            TxBuffer[TxData++] = APLGetTransId();
+                            TxBuffer[TxData++] = APL_FRAME_COMMAND_SET | (APL_FRAME_DATA_TYPE_UINT8 << 4);
+                            TxBuffer[TxData++] = Performance_PduOStr & 0xFF;         // Attribute ID LSB
+                            TxBuffer[TxData++] = (Performance_PduOStr >> 8) & 0xFF;  // Attribute ID MSB
+                            TxBuffer[TxData++] = 0x12;
+
+							// Broadcast
+
+                            params.APSDE_DATA_request.DstAddrMode = APS_ADDRESS_16_BIT;
+                            params.APSDE_DATA_request.DstEndpoint = EP_PERFORMANCE;
+                            params.APSDE_DATA_request.DstAddress.ShortAddr.Val = 0xFFFF;
+
+                            //params.APSDE_DATA_request.asduLength; TxData
+                            params.APSDE_DATA_request.ProfileId.Val = MY_PROFILE_ID;
+                            params.APSDE_DATA_request.RadiusCounter = DEFAULT_RADIUS;
+                            params.APSDE_DATA_request.DiscoverRoute = ROUTE_DISCOVERY_ENABLE;
+                            params.APSDE_DATA_request.TxOptions.Val = 0;
+                            params.APSDE_DATA_request.SrcEndpoint = EP_PERFORMANCE;
+                            params.APSDE_DATA_request.ClusterId =  Performance_CLUSTER;
+
+                            ConsolePutROMString( (ROM char *)" Starting the test...\r\n" );
+
+                            currentPrimitive = APSDE_DATA_request;
+						}
+
 
                         #ifdef I_AM_SWITCH
                         if ( myStatusFlags.bits.bLightSwitchToggled )
@@ -581,6 +620,7 @@ void main(void)
                         }
                         else
                         #endif
+/*
                         #ifdef USE_BINDINGS
                         if (myStatusFlags.bits.bBindSwitchToggled)
                         {
@@ -678,7 +718,7 @@ void main(void)
                             currentPrimitive = APSDE_DATA_request;
                         }
                         #endif
-
+*/
                         // Re-enable interrupts.
                         RBIE = 1;
                     }
