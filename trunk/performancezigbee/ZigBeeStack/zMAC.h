@@ -59,6 +59,7 @@ void MACDiscardRx(void);
 
 #define aUnitBackoffPeriod 20
 #define aMaxBE 5
+//#define aMaxBE 5
 
 #define SCAN_DURATION_0 SYMBOLS_TO_TICKS(120)
 #define SCAN_DURATION_1 SYMBOLS_TO_TICKS(180)
