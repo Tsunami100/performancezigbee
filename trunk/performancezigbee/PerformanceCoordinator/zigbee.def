@@ -86,5 +86,5 @@
 #define EP_PERFORMANCE 7
 #define MY_MAX_INPUT_CLUSTERS 1
 #define MY_MAX_OUTPUT_CLUSTERS 1
-#include "C:\MpZBee\ZigBeeStack\zProfilePerfomance.h"
+#include "C:\MpZBee\Performance\ZigBeeStack\zProfilePerfomance.h"
 #endif
