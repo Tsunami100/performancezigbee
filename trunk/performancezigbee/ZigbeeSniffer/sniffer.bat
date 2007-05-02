@@ -1,0 +1,1 @@
+ C:\j2sdk1.4.2_07\bin\java.exe -classpath C:\eclipseworkspace\ZigbeeSniffer2\bin;C:\eclipseworkspace\ZigbeeSniffer2\comm.jar Sniffer %1 %2 %3
