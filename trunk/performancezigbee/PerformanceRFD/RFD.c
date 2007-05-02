@@ -192,6 +192,9 @@ NETWORK_DESCRIPTOR  *NetworkDescriptor;
 
 TICK                lastTestePerformance;
 
+unsigned int packetsNumber = 0;
+unsigned int maxPacketsNumber = 1000;
+
 //******************************************************************************
 // Function Prototypes
 //******************************************************************************
@@ -533,6 +536,99 @@ void main(void)
                                 } // each transaction
                             } // frame type
                             break;
+                        case EP_PERFORMANCE:
+						            	ConsolePutROMString( (ROM char *)"Iniciando teste de performance...\r\n" );
+										myStatusFlags.bits.bTestePerformance = TRUE;
+										packetsNumber = 0;
+										lastTestePerformance = TickGet();
+										BIND_INDICATION = 1;
+
+                            if ((frameHeader & APL_FRAME_TYPE_MASK) == APL_FRAME_TYPE_KVP)
+                            {
+                                frameHeader &= APL_FRAME_COUNT_MASK;
+                                for (transaction=0; transaction<frameHeader; transaction++)
+                                {
+                                    sequenceNumber          = APLGet();
+                                    command                 = APLGet();
+                                    attributeId.byte.LSB    = APLGet();
+                                    attributeId.byte.MSB    = APLGet();
+
+                                    //dataType = command & APL_FRAME_DATA_TYPE_MASK;
+                                    command &= APL_FRAME_COMMAND_MASK;
+
+
+                                    if ((params.APSDE_DATA_indication.ClusterId ==Performance_CLUSTER) &&
+                                        (attributeId.Val == Performance_PduOStr))
+                                    {
+/*
+                                        if ((command == APL_FRAME_COMMAND_SET) ||
+                                            (command == APL_FRAME_COMMAND_SETACK))
+                                        {
+                                            // Prepare a response in case it is needed.
+                                            TxBuffer[TxData++] = APL_FRAME_TYPE_KVP | 1;    // KVP, 1 transaction
+                                            TxBuffer[TxData++] = sequenceNumber;
+                                            TxBuffer[TxData++] = APL_FRAME_COMMAND_SET_RES | (APL_FRAME_DATA_TYPE_UINT8 << 4);
+                                            TxBuffer[TxData++] = attributeId.byte.LSB;
+                                            TxBuffer[TxData++] = attributeId.byte.MSB;
+
+                                            // Data type for this attibute must be APL_FRAME_DATA_TYPE_UINT8
+                                            data = APLGet();
+                                            switch (data)
+                                            {
+                                                case LIGHT_OFF:
+                                                    ConsolePutROMString( (ROM char *)" Turning light off.\r\n" );
+                                                    MESSAGE_INDICATION = 0;
+                                                    TxBuffer[TxData++] = SUCCESS;
+                                                    break;
+                                                case LIGHT_ON:
+                                                    ConsolePutROMString( (ROM char *)" Turning light on.\r\n" );
+                                                    MESSAGE_INDICATION = 1;
+                                                    TxBuffer[TxData++] = SUCCESS;
+                                                    break;
+                                                case LIGHT_TOGGLE:
+                                                    ConsolePutROMString( (ROM char *)" Toggling light.\r\n" );
+                                                    MESSAGE_INDICATION ^= 1;
+                                                    TxBuffer[TxData++] = SUCCESS;
+                                                    break;
+                                                default:
+                                                    PrintChar( data );
+                                                    ConsolePutROMString( (ROM char *)" Invalid light message.\r\n" );
+                                                    TxBuffer[TxData++] = KVP_INVALID_ATTRIBUTE_DATA;
+                                                    break;
+                                            }
+                                        }
+                                        if (command == APL_FRAME_COMMAND_SETACK)
+                                        {
+                                            // Send back an application level acknowledge.
+                                            ZigBeeBlockTx();
+
+                                            // Take care here that parameters are not overwritten before they are used.
+                                            // We can use the data byte as a temporary variable.
+                                            params.APSDE_DATA_request.DstAddrMode = params.APSDE_DATA_indication.SrcAddrMode;
+                                            params.APSDE_DATA_request.DstEndpoint = params.APSDE_DATA_indication.SrcEndpoint;
+                                            params.APSDE_DATA_request.DstAddress.ShortAddr = params.APSDE_DATA_indication.SrcAddress.ShortAddr;
+
+                                            //params.APSDE_DATA_request.asduLength; TxData
+                                            //params.APSDE_DATA_request.ProfileId; unchanged
+                                            params.APSDE_DATA_request.RadiusCounter = DEFAULT_RADIUS;
+                                            params.APSDE_DATA_request.DiscoverRoute = ROUTE_DISCOVERY_ENABLE;
+                                            params.APSDE_DATA_request.TxOptions.Val = 0;
+                                            params.APSDE_DATA_request.SrcEndpoint = EP_LIGHT;
+                                            //params.APSDE_DATA_request.ClusterId; unchanged
+
+                                            currentPrimitive = APSDE_DATA_request;
+                                        }
+                                        else
+                                        {
+                                            // We are not sending an acknowledge, so reset the transmit message pointer.
+                                            TxData = TX_DATA_START;
+                                        }
+*/
+                                    }
+                                    // TODO read to the end of the transaction.
+                                } // each transaction
+                            } // frame type
+                            break;
                         default:
                             // If the command type was something that requested an acknowledge, we could send back
                             // KVP_INVALID_ENDPOINT here.
@@ -553,6 +649,7 @@ void main(void)
                 else
                 {
                     ConsolePutROMString( (ROM char *)" Message sent successfully.\r\n" );
+					packetsNumber++;
                 }
                 currentPrimitive = NO_PRIMITIVE;
                 break;
@@ -750,53 +847,56 @@ void main(void)
                         }
                         else
                         {
-							if (myStatusFlags.bits.bTestePerformance)
+							if (myStatusFlags.bits.bTestePerformance && packetsNumber < maxPacketsNumber)
 							{
 								TICK currentTime;
 								currentTime = TickGet();
 
-								if (TickGetDiff(currentTime, lastTestePerformance) >= (ONE_SECOND/4)  & ZigBeeReady())
+								if (TickGetDiff(currentTime, lastTestePerformance) >= (ONE_SECOND/40)  & ZigBeeReady())
+								//if (TickGetDiff(currentTime, lastTestePerformance) >= (ONE_SECOND/100)  & ZigBeeReady())
 								{
 									int i;
-		                        	ConsolePutROMString( (ROM char *)"Hora de enviar novo pdu...\r\n" );
+									BYTE sizePacket = 70;
 
-                            TxBuffer[TxData++] = APL_FRAME_TYPE_KVP;    // KVP, 1 transaction
+		                        	//ConsolePutROMString( (ROM char *)"Hora de enviar novo pdu...\r\n" );
 
-                            TxBuffer[TxData++] = APLGetTransId();
-                            TxBuffer[TxData++] = APL_FRAME_COMMAND_SET | (Performance_PduOStr_DATATYPE << 4);
-                            TxBuffer[TxData++] = Performance_PduOStr & 0xFF;         // Attribute ID LSB
-                            TxBuffer[TxData++] = (Performance_PduOStr >> 8) & 0xFF;  // Attribute ID MSB
-                            TxBuffer[TxData++] = 0x00;
-							TxBuffer[TxData++] = 0x00;
+                            		TxBuffer[TxData++] = APL_FRAME_TYPE_MSG | 1;    // KVP, 1 transaction
 
-                            #ifdef USE_BINDINGS
-                                params.APSDE_DATA_request.DstAddrMode = APS_ADDRESS_NOT_PRESENT;
-                            #else
-                                params.APSDE_DATA_request.DstAddrMode = APS_ADDRESS_16_BIT;
-                                params.APSDE_DATA_request.DstEndpoint = EP_PERFORMANCE;
-                                params.APSDE_DATA_request.DstAddress.ShortAddr = destinationAddress;
-                            #endif
+                            		TxBuffer[TxData++] = APLGetTransId();
+	                                TxBuffer[TxData++] = sizePacket; // Transaction Length
 
-                            //params.APSDE_DATA_request.asduLength; TxData
-                            params.APSDE_DATA_request.ProfileId.Val = MY_PROFILE_ID;
-                            params.APSDE_DATA_request.RadiusCounter = DEFAULT_RADIUS;
-                            params.APSDE_DATA_request.DiscoverRoute = ROUTE_DISCOVERY_ENABLE;
-                            params.APSDE_DATA_request.TxOptions.Val = 0;
-                            params.APSDE_DATA_request.SrcEndpoint = EP_PERFORMANCE;
-                            params.APSDE_DATA_request.ClusterId = Performance_CLUSTER;
+									for(i=0;i<sizePacket;i++)
+									{
+										TxBuffer[TxData++] = 0xEF;
+									}
 
-                            ConsolePutROMString( (ROM char *)" Trying to send performance message.\r\n" );
+	                                params.APSDE_DATA_request.DstAddrMode = APS_ADDRESS_16_BIT;
+	                                params.APSDE_DATA_request.DstEndpoint = EP_PERFORMANCE;
+	                                params.APSDE_DATA_request.DstAddress.ShortAddr.Val = 0x0000;
 
-                            currentPrimitive = APSDE_DATA_request;
+		                            //params.APSDE_DATA_request.asduLength; TxData
+		                            params.APSDE_DATA_request.ProfileId.Val = MY_PROFILE_ID;
+		                            params.APSDE_DATA_request.RadiusCounter = DEFAULT_RADIUS;
+		                            params.APSDE_DATA_request.DiscoverRoute = ROUTE_DISCOVERY_ENABLE;
+		                            params.APSDE_DATA_request.TxOptions.Val = 0;
+									params.APSDE_DATA_request.TxOptions.bits.acknowledged = FALSE;
+params.MCPS_DATA_request.TxOptions.bits.acknowledged_transmission = 0;
+		                            params.APSDE_DATA_request.SrcEndpoint = EP_PERFORMANCE;
+		                            params.APSDE_DATA_request.ClusterId = Performance_CLUSTER;
 
-//        		                PrintChar( (ONE_SECOND*5) );
-//                        		ConsolePutROMString( (ROM char *)"   " );
-//        		                PrintChar( TickGetDiff(currentTime, lastTestePerformance) );
-////                		        PrintChar( currentTime.byte.b1 );
-//                        		ConsolePutROMString( (ROM char *)".\r\n" );
+                            		ConsolePutROMString( (ROM char *)" Trying to send performance message.\r\n" );
+
+                            		currentPrimitive = APSDE_DATA_request;
 
 									lastTestePerformance = currentTime;
+									MESSAGE_INDICATION ^= 1;
 								}
+							}
+							else if (myStatusFlags.bits.bTestePerformance && packetsNumber >= maxPacketsNumber)
+							{
+								MESSAGE_INDICATION = 0;
+								BIND_INDICATION = 0;
+								myStatusFlags.bits.bTestePerformance = FALSE;
 							}
 							else if (!ZigBeeStatus.flags.bits.bHasBackgroundTasks && myProcessesAreDone())
                             {
@@ -959,12 +1059,14 @@ void UserInterruptHandler(void)
 			{
             	ConsolePutROMString( (ROM char *)"Parando teste de performance...\r\n" );
 				myStatusFlags.bits.bTestePerformance = FALSE;
+										BIND_INDICATION = 0;
 			}
 			else
 			{
             	ConsolePutROMString( (ROM char *)"Iniciando teste de performance...\r\n" );
 				myStatusFlags.bits.bTestePerformance = TRUE;
 				lastTestePerformance = TickGet();
+										BIND_INDICATION = 1;
 			}
 		}
 
