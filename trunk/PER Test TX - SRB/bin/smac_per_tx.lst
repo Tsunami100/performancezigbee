@@ -1,0 +1,1150 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /****************************************************************************
+    2:  application smac_per_tx.c.
+    3:  This is a basic PER test.  The TX portion of the application
+    4:  sends out 1000 packets.
+    5:  
+    6:  Author: Freescale
+    7:  
+    8:  Application Note: 
+    9:  \****************************************************************************/
+   10:  
+   11:  #include <hidef.h> /* for EnableInterrupts macro */
+   12:  #include "pub_def.h"
+   13:  #include "APP_SMAC_API.h"
+   14:  #include "freescale_radio_hardware.h"
+   15:  #include "SCI.h"
+   16:  #include "smac_per_tx.h"
+   17:  #include "eventDefs.h"
+   18:  #include "timer.h"
+   19:  #include "ledFunctions.h"
+   20:  #include "kbi.h"
+   21:  #include "ascii_utilities.h"
+   22:  #if SMAC_FEATURE_OTAP == TRUE
+   23:  #include "APP_OTAP_API.h"
+   24:  #endif // SMAC_FEATURE_OTAP == TRUE
+   25:  #if SMAC_FEATURE_SECURITY == TRUE
+   26:  #include "APP_security_API.h"
+   27:  #endif // SMAC_FEATURE_SECURITY == TRUE
+   28:  #if (EMBEDDED_BOOTLOADER == TRUE)  
+   29:  #include "bootloader user api.h"
+   30:  #endif
+   31:  
+   32:  #if SMAC_FEATURE_OTAP == TRUE
+   33:  #include "APP_OTAP_API.h"
+   34:  #endif // SMAC_FEATURE_OTAP == TRUE
+   35:  
+   36:  #if SMAC_FEATURE_SECURITY == TRUE
+   37:  #include "APP_security_API.h"
+   38:  #endif // SMAC_FEATURE_SECURITY == TRUE
+   39:  
+   40:  /* Global Variables */
+   41:  byte gu8RTxMode; /* needed for s-mac, application can read this variable */
+   42:  				/* rtx_mode is the software state variable of the radio */
+   43:  				/* This variable reflects the current state of MC13192 */
+   44:  int app_status = 0; 
+   45:  byte led_status = 0;
+   46:  UINT8 gu8Channel = CHANNEL_NUMBER;
+   47:  UINT16 gu16Events = 0;
+   48:  extern UINT16 gu16msTimer;
+   49:  extern UINT16 gu16timerEvent[2];
+   50:  
+   51:  UINT32 packet_count = 0;
+   52:  UINT32 packet_number = 0;
+   53:  UINT32 packet_size = 0;
+   54:  UINT32 packet_interval = 0;
+   55:  
+   56:  void main(void) {
+  0000 a7c2     [2]             AIS   #-62
+   57:  
+   58:  	tRxPacket rx_packet;  //SMAC structure for RX packets
+   59:  	tTxPacket tx_packet;	//SMAC structure for TX packets
+   60:  	byte rx_data_buffer[20];	//Data buffer to hold RX data, if you want larger packets change 20 to what you need.
+   61:  	byte tx_data_buffer[20];	//Data buffer to hold TX data, if you want larger packets change 20 to what you need.
+   62:  	UINT16 loop;
+   63:  	UINT8 i;
+   64:  
+   65:     char App_String[10];
+   66:  	
+   67:  	//Initialize the packet.
+   68:    tx_packet.u8DataLength = 0;				//Set TX default to 0
+  0002 9e6f04   [6]             CLR   4,SP
+   69:    tx_packet.pu8Data = &tx_data_buffer[0];	//Load the address of our txbuffer into tx structure.
+  0005 95       [2]             TSX   
+  0006 af16     [2]             AIX   #22
+  0008 9eff05   [5]             STHX  5,SP
+   70:    rx_packet.u8DataLength = 0;				//Set RX default to 0
+  000b 9e6f09   [6]             CLR   9,SP
+   71:    rx_packet.pu8Data = &rx_data_buffer[0];	//Load the address of our rxbuffer into rx structure
+  000e af14     [2]             AIX   #20
+  0010 9eff0a   [5]             STHX  10,SP
+   72:    rx_packet.u8MaxDataLength = 100;		//Define the max buffer we are interested in.
+  0013 a664     [2]             LDA   #100
+  0015 95       [2]             TSX   
+  0016 e707     [3]             STA   7,X
+   73:    rx_packet.u8Status = 0;					//initialize the status packet to 0.
+  0018 6f0b     [5]             CLR   11,X
+   74:    
+   75:  
+   76:    
+   77:     MCUInit();		//Initialize the mcu, setup GPIOs, SPI, clock scheme, etc.
+  001a cd0000   [6]             JSR   MCUInit
+   78:     RadioInit();
+  001d cd0000   [6]             JSR   RadioInit
+   79:     KBIInit();
+  0020 cd0000   [6]             JSR   KBIInit
+   80:     
+   81:     KBI_ENABLEINTERRUPTS;  
+  0023 1200     [5]             BSET  1,_KBI1SC
+   82:     app_init();
+  0025 cd0000   [6]             JSR   app_init
+   83:  	SCIInitGeneric(8000000, 38400, DEFAULT_SCI_PORT);	
+  0028 451200   [3]             LDHX  #4608
+  002b 89       [2]             PSHX  
+  002c 8b       [2]             PSHH  
+  002d ae7a     [2]             LDX   #122
+  002f 8c       [1]             CLRH  
+  0030 89       [2]             PSHX  
+  0031 8b       [2]             PSHH  
+  0032 459600   [3]             LDHX  #-27136
+  0035 89       [2]             PSHX  
+  0036 8b       [2]             PSHH  
+  0037 89       [2]             PSHX  
+  0038 89       [2]             PSHX  
+  0039 a602     [2]             LDA   #2
+  003b cd0000   [6]             JSR   SCIInitGeneric
+  003e a708     [2]             AIS   #8
+   84:    		
+   85:  	(void)MLMESetMC13192ClockRate(0);  /* Set initial Clk speed from MC13192s CLKO*/
+  0040 4f       [1]             CLRA  
+  0041 cd0000   [6]             JSR   MLMESetMC13192ClockRate
+   86:  	UseExternalClock();	/* switch clock sources to EXTERNAL clock */
+  0044 cd0000   [6]             JSR   UseExternalClock
+   87:  	
+   88:  	/* include your start up code here */	
+   89:    EnableInterrupts; /* Turn on system interrupts */
+  0047 9a       [1]             CLI   
+   90:  	(void)MLMESetChannelRequest(CHANNEL_NUMBER);	//Set channel zero, can be changed to users preference
+  0048 a60f     [2]             LDA   #15
+  004a cd0000   [6]             JSR   MLMESetChannelRequest
+   91:  	
+   92:  #if (EMBEDDED_BOOTLOADER == TRUE)
+   93:    boot_init();  //Initialize the bootloader...in bootloader user api.c
+   94:  #endif 
+   95:  	
+   96:    /******************************************************************
+   97:    To adjust output power call the MLME_MC13192_PA_output_adjust() with:
+   98:    
+   99:    MAX_POWER     (+3 to +5dBm)
+  100:    NOMINAL_POWER (0 dBm)
+  101:    MIN_POWER     ~(-16dBm)
+  102:    
+  103:    or somewhere custom ? (0-15, 11 (NOMINAL_POWER) being Default power)
+  104:  
+  105:  	******************************************************************/
+  106:    //MLMEMC13192PAOutputAdjust(MAX_POWER);	//Set MAX power setting
+  107:    //MLMEMC13192PAOutputAdjust(MIN_POWER);	//Set MIN power setting
+  108:    (void)MLMEMC13192PAOutputAdjust(OUTPUT_POWER);	//Set Nominal power setting	
+  004d a60b     [2]             LDA   #11
+  004f cd0000   [6]             JSR   MLMEMC13192PAOutputAdjust
+  109:    
+  110:    
+  111:    
+  112:    #if (EMBEDDED_BOOTLOADER == TRUE)
+  113:        boot_call();  //Checks for user request for bootloader.
+  114:                      //Runs bootloader if requested.  Code will not return.
+  115:    #endif 
+  116:    
+  117:    app_status = INITIAL_STATE;		//Set the initial app_status of the application state variable to INITIAL_STATE
+  0052 ae01     [2]             LDX   #1
+  0054 8c       [1]             CLRH  
+  0055 960000   [5]             STHX  app_status
+  118:  		
+  119:  	SCITransmitStr("\n\n\n\r\rFirmware para testes de PER.\n\r");
+  0058 450000   [3]             LDHX  @"\012\012\012\015\015Firmware para testes de PER.\012\015"
+  005b cd0000   [6]             JSR   SCITransmitStr
+  120:  	SCITransmitStr("\rOperando no canal ");
+  005e 450000   [3]             LDHX  @"\015Operando no canal "
+  0061 cd0000   [6]             JSR   SCITransmitStr
+  121:    (void)int2string((UINT32) gu8Channel, App_String);
+  0064 c60000   [4]             LDA   gu8Channel
+  0067 87       [2]             PSHA  
+  0068 4f       [1]             CLRA  
+  0069 87       [2]             PSHA  
+  006a 87       [2]             PSHA  
+  006b 87       [2]             PSHA  
+  006c 95       [2]             TSX   
+  006d af10     [2]             AIX   #16
+  006f cd0000   [6]             JSR   int2string
+  0072 a704     [2]             AIS   #4
+  122:  	(void)trimWhiteSpace(App_String);
+  0074 95       [2]             TSX   
+  0075 af0c     [2]             AIX   #12
+  0077 cd0000   [6]             JSR   trimWhiteSpace
+  123:  	SCITransmitStr(App_String);	
+  007a 95       [2]             TSX   
+  007b af0c     [2]             AIX   #12
+  007d cd0000   [6]             JSR   SCITransmitStr
+  124:  	SCITransmitStr("\n\r");        	      
+  0080 450000   [3]             LDHX  @"\012\015"
+  0083 cd0000   [6]             JSR   SCITransmitStr
+  125:  		
+  126:    //Loop forever
+  127:  	for (;;) {
+  0086 cc03a5   [4]             JMP   L3A5 ;abs = 03a5
+  0089          L89:    
+  128:  
+  129:  		switch (app_status) {
+  0089 320000   [5]             LDHX  app_status
+  008c 650007   [3]             CPHX  #7
+  008f 9025     [3]             BGE   LB6 ;abs = 00b6
+  0091 650005   [3]             CPHX  #5
+  0094 9010     [3]             BGE   LA6 ;abs = 00a6
+  0096 650001   [3]             CPHX  #1
+  0099 274b     [3]             BEQ   LE6 ;abs = 00e6
+  009b 650002   [3]             CPHX  #2
+  009e 2603     [3]             BNE   LA3 ;abs = 00a3
+  00a0 cc02a2   [4]             JMP   L2A2 ;abs = 02a2
+  00a3          LA3:    
+  00a3 cc0371   [4]             JMP   L371 ;abs = 0371
+  00a6          LA6:    
+  00a6 2603     [3]             BNE   LAB ;abs = 00ab
+  00a8 cc0254   [4]             JMP   L254 ;abs = 0254
+  00ab          LAB:    
+  00ab 650006   [3]             CPHX  #6
+  00ae 2603     [3]             BNE   LB3 ;abs = 00b3
+  00b0 cc0164   [4]             JMP   L164 ;abs = 0164
+  00b3          LB3:    
+  00b3 cc0371   [4]             JMP   L371 ;abs = 0371
+  00b6          LB6:    
+  00b6 65000a   [3]             CPHX  #10
+  00b9 901b     [3]             BGE   LD6 ;abs = 00d6
+  00bb 650007   [3]             CPHX  #7
+  00be 2603     [3]             BNE   LC3 ;abs = 00c3
+  00c0 cc02a8   [4]             JMP   L2A8 ;abs = 02a8
+  00c3          LC3:    
+  00c3 650008   [3]             CPHX  #8
+  00c6 2603     [3]             BNE   LCB ;abs = 00cb
+  00c8 cc02e4   [4]             JMP   L2E4 ;abs = 02e4
+  00cb          LCB:    
+  00cb 650009   [3]             CPHX  #9
+  00ce 2603     [3]             BNE   LD3 ;abs = 00d3
+  00d0 cc02fd   [4]             JMP   L2FD ;abs = 02fd
+  00d3          LD3:    
+  00d3 cc0371   [4]             JMP   L371 ;abs = 0371
+  00d6          LD6:    
+  00d6 2603     [3]             BNE   LDB ;abs = 00db
+  00d8 cc0371   [4]             JMP   L371 ;abs = 0371
+  00db          LDB:    
+  00db 65000b   [3]             CPHX  #11
+  00de 2603     [3]             BNE   LE3 ;abs = 00e3
+  00e0 cc0178   [4]             JMP   L178 ;abs = 0178
+  00e3          LE3:    
+  00e3 cc0371   [4]             JMP   L371 ;abs = 0371
+  00e6          LE6:    
+  130:  			
+  131:  			case INITIAL_STATE:		//Walk the LEDs
+  132:  			
+  133:  				//For TX
+  134:  				LED1 = LED_OFF;		//Turn off all LEDs
+  00e6 1800     [5]             BSET  4,_PTDD
+  135:  				LED2 = LED_OFF;
+  00e8 1a00     [5]             BSET  5,_PTDD
+  136:  				LED3 = LED_OFF;
+  00ea 1c00     [5]             BSET  6,_PTDD
+  137:  				LED4 = LED_OFF;
+  00ec 1e00     [5]             BSET  7,_PTDD
+  138:  				
+  139:  				LED1 = LED_ON;									//Lights LED1
+  00ee 1900     [5]             BCLR  4,_PTDD
+  140:  				for (loop = 0; loop < LED_DELAY; loop++);		
+  00f0 95       [2]             TSX   
+  00f1 6f02     [5]             CLR   2,X
+  00f3 6f01     [5]             CLR   1,X
+  00f5          LF5:    
+  00f5 95       [2]             TSX   
+  00f6 6c02     [5]             INC   2,X
+  00f8 2602     [3]             BNE   LFC ;abs = 00fc
+  00fa 6c01     [5]             INC   1,X
+  00fc          LFC:    
+  00fc 9efe02   [5]             LDHX  2,SP
+  00ff 65b000   [3]             CPHX  #-20480
+  0102 25f1     [3]             BCS   LF5 ;abs = 00f5
+  141:  				LED1 = LED_OFF; LED2 = LED_ON;					//Lights LED2, Turns off LED1
+  0104 1800     [5]             BSET  4,_PTDD
+  0106 1b00     [5]             BCLR  5,_PTDD
+  142:  				for (loop = 0; loop < LED_DELAY; loop++);
+  0108 95       [2]             TSX   
+  0109 6f02     [5]             CLR   2,X
+  010b 6f01     [5]             CLR   1,X
+  010d          L10D:   
+  010d 95       [2]             TSX   
+  010e 6c02     [5]             INC   2,X
+  0110 2602     [3]             BNE   L114 ;abs = 0114
+  0112 6c01     [5]             INC   1,X
+  0114          L114:   
+  0114 9efe02   [5]             LDHX  2,SP
+  0117 65b000   [3]             CPHX  #-20480
+  011a 25f1     [3]             BCS   L10D ;abs = 010d
+  143:  				LED2 = LED_OFF; LED3 = LED_ON;					//Lights LED3, Turns off LED2
+  011c 1a00     [5]             BSET  5,_PTDD
+  011e 1d00     [5]             BCLR  6,_PTDD
+  144:  				for (loop = 0; loop < LED_DELAY; loop++);
+  0120 95       [2]             TSX   
+  0121 6f02     [5]             CLR   2,X
+  0123 6f01     [5]             CLR   1,X
+  0125          L125:   
+  0125 95       [2]             TSX   
+  0126 6c02     [5]             INC   2,X
+  0128 2602     [3]             BNE   L12C ;abs = 012c
+  012a 6c01     [5]             INC   1,X
+  012c          L12C:   
+  012c 9efe02   [5]             LDHX  2,SP
+  012f 65b000   [3]             CPHX  #-20480
+  0132 25f1     [3]             BCS   L125 ;abs = 0125
+  145:  				LED3 = LED_OFF; LED4 = LED_ON;					//Lights LED4, Turns off LED3
+  0134 1c00     [5]             BSET  6,_PTDD
+  0136 1f00     [5]             BCLR  7,_PTDD
+  146:  				for (loop = 0; loop < LED_DELAY; loop++);
+  0138 95       [2]             TSX   
+  0139 6f02     [5]             CLR   2,X
+  013b 6f01     [5]             CLR   1,X
+  013d          L13D:   
+  013d 95       [2]             TSX   
+  013e 6c02     [5]             INC   2,X
+  0140 2602     [3]             BNE   L144 ;abs = 0144
+  0142 6c01     [5]             INC   1,X
+  0144          L144:   
+  0144 9efe02   [5]             LDHX  2,SP
+  0147 65b000   [3]             CPHX  #-20480
+  014a 25f1     [3]             BCS   L13D ;abs = 013d
+  147:  				LED4 = LED_OFF;									//Turns off LED4
+  014c 1e00     [5]             BSET  7,_PTDD
+  148:  				LED1 = LED_ON; 
+  014e 1900     [5]             BCLR  4,_PTDD
+  149:  
+  150:  				packet_count=0;
+  0150 5f       [1]             CLRX  
+  0151 8c       [1]             CLRH  
+  0152 960002   [5]             STHX  packet_count:2
+  0155 8c       [1]             CLRH  
+  0156 960000   [5]             STHX  packet_count
+  151:  		    
+  152:  		    SCITransmitStr("\n\r\n\rIniciando Transmissor. Aguardando pacote de START...");		     		      
+  0159 450000   [3]             LDHX  @"\012\015\012\015Iniciando Transmissor. Aguardando pacote de START..."
+  015c cd0000   [6]             JSR   SCITransmitStr
+  153:  		    
+  154:  				app_status = RX_STATE;	//Switch app status to TX_STATE
+  015f ae06     [2]             LDX   #6
+  155:  				
+  156:          break;
+  0161 cc036d   [4]             JMP   L36D ;abs = 036d
+  0164          L164:   
+  157:  			case RX_STATE:
+  158:  			
+  159:  				MLMERXEnableRequest(&rx_packet,0); //Zero means wait forever with RX ON.
+  0164 95       [2]             TSX   
+  0165 af07     [2]             AIX   #7
+  0167 89       [2]             PSHX  
+  0168 8b       [2]             PSHH  
+  0169 4f       [1]             CLRA  
+  016a 87       [2]             PSHA  
+  016b 87       [2]             PSHA  
+  016c 87       [2]             PSHA  
+  016d 87       [2]             PSHA  
+  016e cd0000   [6]             JSR   MLMERXEnableRequest
+  0171 a706     [2]             AIS   #6
+  160:  				
+  161:  				app_status = RECEIVER_ALWAYS_ON;
+  0173 ae03     [2]             LDX   #3
+  162:  				
+  163:  				break;
+  0175 cc036d   [4]             JMP   L36D ;abs = 036d
+  0178          L178:   
+  164:  			case RECEIVER_ALWAYS_ON:
+  165:  			
+  166:  				break;
+  167:  		  case START_RECEIVED:
+  168:  		  
+  169:  			  SCITransmitStr("\n\rPacote de START recebido.");
+  0178 450000   [3]             LDHX  @"\012\015Pacote de START recebido."
+  017b cd0000   [6]             JSR   SCITransmitStr
+  170:  			  
+  171:  			  SCITransmitStr("\n\rNumero de pacotes:");
+  017e 450000   [3]             LDHX  @"\012\015Numero de pacotes:"
+  0181 cd0000   [6]             JSR   SCITransmitStr
+  172:  			  (void)int2string((UINT32) packet_number, App_String);
+  0184 320002   [5]             LDHX  packet_number:2
+  0187 89       [2]             PSHX  
+  0188 8b       [2]             PSHH  
+  0189 320000   [5]             LDHX  packet_number
+  018c 89       [2]             PSHX  
+  018d 8b       [2]             PSHH  
+  018e 95       [2]             TSX   
+  018f af10     [2]             AIX   #16
+  0191 cd0000   [6]             JSR   int2string
+  0194 a704     [2]             AIS   #4
+  173:  			  (void)trimWhiteSpace(App_String);
+  0196 95       [2]             TSX   
+  0197 af0c     [2]             AIX   #12
+  0199 cd0000   [6]             JSR   trimWhiteSpace
+  174:  			  SCITransmitStr(App_String);
+  019c 95       [2]             TSX   
+  019d af0c     [2]             AIX   #12
+  019f cd0000   [6]             JSR   SCITransmitStr
+  175:  
+  176:  			  SCITransmitStr("\n\rTamanho dos pacotes:");
+  01a2 450000   [3]             LDHX  @"\012\015Tamanho dos pacotes:"
+  01a5 cd0000   [6]             JSR   SCITransmitStr
+  177:  			  (void)int2string((UINT32) packet_size, App_String);
+  01a8 320002   [5]             LDHX  packet_size:2
+  01ab 89       [2]             PSHX  
+  01ac 8b       [2]             PSHH  
+  01ad 320000   [5]             LDHX  packet_size
+  01b0 89       [2]             PSHX  
+  01b1 8b       [2]             PSHH  
+  01b2 95       [2]             TSX   
+  01b3 af10     [2]             AIX   #16
+  01b5 cd0000   [6]             JSR   int2string
+  01b8 a704     [2]             AIS   #4
+  178:  			  (void)trimWhiteSpace(App_String);
+  01ba 95       [2]             TSX   
+  01bb af0c     [2]             AIX   #12
+  01bd cd0000   [6]             JSR   trimWhiteSpace
+  179:  			  SCITransmitStr(App_String);
+  01c0 95       [2]             TSX   
+  01c1 af0c     [2]             AIX   #12
+  01c3 cd0000   [6]             JSR   SCITransmitStr
+  180:  
+  181:  			  SCITransmitStr("\n\rIntervalo entre os pacotes:");
+  01c6 450000   [3]             LDHX  @"\012\015Intervalo entre os pacotes:"
+  01c9 cd0000   [6]             JSR   SCITransmitStr
+  182:  			  (void)int2string((UINT32) packet_interval, App_String);
+  01cc 320002   [5]             LDHX  packet_interval:2
+  01cf 89       [2]             PSHX  
+  01d0 8b       [2]             PSHH  
+  01d1 320000   [5]             LDHX  packet_interval
+  01d4 89       [2]             PSHX  
+  01d5 8b       [2]             PSHH  
+  01d6 95       [2]             TSX   
+  01d7 af10     [2]             AIX   #16
+  01d9 cd0000   [6]             JSR   int2string
+  01dc a704     [2]             AIS   #4
+  183:  			  (void)trimWhiteSpace(App_String);
+  01de 95       [2]             TSX   
+  01df af0c     [2]             AIX   #12
+  01e1 cd0000   [6]             JSR   trimWhiteSpace
+  184:  			  SCITransmitStr(App_String);
+  01e4 95       [2]             TSX   
+  01e5 af0c     [2]             AIX   #12
+  01e7 cd0000   [6]             JSR   SCITransmitStr
+  185:  
+  186:  				for (i=0; i<(packet_size-2); i++) {
+  01ea 9e6f07   [6]             CLR   7,SP
+  01ed 2015     [3]             BRA   L204 ;abs = 0204
+  01ef          L1EF:   
+  187:  				   tx_data_buffer[i] = 0xAA; // 10101010
+  01ef 95       [2]             TSX   
+  01f0 af16     [2]             AIX   #22
+  01f2 9f       [1]             TXA   
+  01f3 9eeb07   [4]             ADD   7,SP
+  01f6 87       [2]             PSHA  
+  01f7 8b       [2]             PSHH  
+  01f8 86       [3]             PULA  
+  01f9 a900     [2]             ADC   #0
+  01fb 87       [2]             PSHA  
+  01fc 8a       [3]             PULH  
+  01fd 88       [3]             PULX  
+  01fe a6aa     [2]             LDA   #-86
+  0200 f7       [2]             STA   ,X
+  0201 9e6c07   [6]             INC   7,SP
+  0204          L204:   
+  0204 450000   [3]             LDHX  @packet_size
+  0207 e603     [3]             LDA   3,X
+  0209 a002     [2]             SUB   #2
+  020b 87       [2]             PSHA  
+  020c e602     [3]             LDA   2,X
+  020e a200     [2]             SBC   #0
+  0210 87       [2]             PSHA  
+  0211 e601     [3]             LDA   1,X
+  0213 a200     [2]             SBC   #0
+  0215 87       [2]             PSHA  
+  0216 f6       [3]             LDA   ,X
+  0217 a200     [2]             SBC   #0
+  0219 9eee03   [4]             LDX   3,SP
+  021c 89       [2]             PSHX  
+  021d 95       [2]             TSX   
+  021e e704     [3]             STA   4,X
+  0220 e602     [3]             LDA   2,X
+  0222 87       [2]             PSHA  
+  0223 e601     [3]             LDA   1,X
+  0225 87       [2]             PSHA  
+  0226 e604     [3]             LDA   4,X
+  0228 87       [2]             PSHA  
+  0229 95       [2]             TSX   
+  022a e60d     [3]             LDA   13,X
+  022c 87       [2]             PSHA  
+  022d 4f       [1]             CLRA  
+  022e 87       [2]             PSHA  
+  022f 87       [2]             PSHA  
+  0230 87       [2]             PSHA  
+  0231 ef04     [3]             STX   4,X
+  0233 87       [2]             PSHA  
+  0234 8b       [2]             PSHH  
+  0235 86       [3]             PULA  
+  0236 e705     [3]             STA   5,X
+  0238 86       [3]             PULA  
+  0239 95       [2]             TSX   
+  023a 89       [2]             PSHX  
+  023b 8b       [2]             PSHH  
+  023c e609     [3]             LDA   9,X
+  023e 87       [2]             PSHA  
+  023f ee08     [3]             LDX   8,X
+  0241 8a       [3]             PULH  
+  0242 cd0000   [6]             JSR   _LCMP
+  0245 a70b     [2]             AIS   #11
+  0247 22a6     [3]             BHI   L1EF ;abs = 01ef
+  188:  				}
+  189:  				tx_packet.u8DataLength = (packet_size-2);
+  0249 c60003   [4]             LDA   packet_size:3
+  024c a002     [2]             SUB   #2
+  024e 9ee704   [4]             STA   4,SP
+  190:  				
+  191:          app_status = TX_STATE;
+  192:          
+  193:          break;
+  0251 cc02f9   [4]             JMP   L2F9 ;abs = 02f9
+  0254          L254:   
+  194:  			case TX_STATE:		 
+  195:  				//Load the tx buffer with the ZigBee packet.
+  196:  				
+  197:  				RAMDrvWriteTx(&tx_packet);
+  0254 95       [2]             TSX   
+  0255 af03     [2]             AIX   #3
+  0257 cd0000   [6]             JSR   RAMDrvWriteTx
+  198:          
+  199:  			  SCITransmitStr("\n\ri\n\r");
+  025a 450000   [3]             LDHX  @"\012\015i\012\015"
+  025d cd0000   [6]             JSR   SCITransmitStr
+  200:  			  
+  201:  			  for (loop=0;loop<packet_number;loop++) {
+  0260 95       [2]             TSX   
+  0261 6f02     [5]             CLR   2,X
+  0263 6f01     [5]             CLR   1,X
+  0265 201b     [3]             BRA   L282 ;abs = 0282
+  0267          L267:   
+  202:  			    
+  203:  			  
+  204:  				  if (MCPSDataRequestWithoutLoad() == SUCCESS)	//TX Packet, Blocking will stay here until the packet is in the air
+  0267 cd0000   [6]             JSR   MCPSDataRequestWithoutLoad
+  026a 650077   [3]             CPHX  #119
+  026d 2606     [3]             BNE   L275 ;abs = 0275
+  205:    				  LED1 ^=1;
+  026f b600     [3]             LDA   _PTDD
+  0271 a810     [2]             EOR   #16
+  0273 b700     [3]             STA   _PTDD
+  0275          L275:   
+  206:  				
+  207:            //packet_count++;
+  208:  				
+  209:  				  //MLME_RX_enable_request(&rx_packet,DELAY_COUNT);	//Now turn on the RX with a timeout of DELAY_COUNT
+  210:            delaySymbols(packet_interval);
+  0275 320002   [5]             LDHX  packet_interval:2
+  0278 cd0000   [6]             JSR   delaySymbols
+  027b 95       [2]             TSX   
+  027c 6c02     [5]             INC   2,X
+  027e 2602     [3]             BNE   L282 ;abs = 0282
+  0280 6c01     [5]             INC   1,X
+  0282          L282:   
+  0282 9efe02   [5]             LDHX  2,SP
+  0285 4f       [1]             CLRA  
+  0286 89       [2]             PSHX  
+  0287 8b       [2]             PSHH  
+  0288 87       [2]             PSHA  
+  0289 87       [2]             PSHA  
+  028a 95       [2]             TSX   
+  028b 89       [2]             PSHX  
+  028c 8b       [2]             PSHH  
+  028d 450000   [3]             LDHX  @packet_number
+  0290 cd0000   [6]             JSR   _LCMP
+  0293 a704     [2]             AIS   #4
+  0295 22d0     [3]             BHI   L267 ;abs = 0267
+  211:            
+  212:  			  }
+  213:  		   
+  214:  			  SCITransmitStr("\n\rf\n\r");
+  0297 450000   [3]             LDHX  @"\012\015f\012\015"
+  029a cd0000   [6]             JSR   SCITransmitStr
+  215:  			  
+  216:  				//if (packet_count < packet_number)
+  217:  				//  app_status = DELAY_STATE ; 	//Set app_status as waiting for ack. 
+  218:  			  //else
+  219:  				  app_status = FINAL_STATE;				
+  029d ae09     [2]             LDX   #9
+  220:  				
+  221:  				break;
+  029f cc036d   [4]             JMP   L36D ;abs = 036d
+  02a2          L2A2:   
+  222:  				
+  223:  			case RESET_STATE:
+  224:  				//MC13192 Reset, reinitialize and return to default state (TX_STATE).
+  225:  				RadioInit();
+  02a2 cd0000   [6]             JSR   RadioInit
+  226:  				app_status = INITIAL_STATE;
+  227:  				break;
+  02a5 cc036b   [4]             JMP   L36B ;abs = 036b
+  02a8          L2A8:   
+  228:  				
+  229:  			case SET_LEDS:
+  230:  				
+  231:  				/* This state takes the power value from the ack and turns on the appropriate LEDs */
+  232:  				
+  233:  				LED1 ^= 1;	/* Toggle LED1 whenever an ack is received. (blinks LED1) */
+  02a8 b600     [3]             LDA   _PTDD
+  02aa a810     [2]             EOR   #16
+  02ac b700     [3]             STA   _PTDD
+  234:  				switch (led_status) {
+  02ae c60000   [4]             LDA   led_status
+  02b1 a103     [2]             CMP   #3
+  02b3 2244     [3]             BHI   L2F9 ;abs = 02f9
+  02b5 a102     [2]             CMP   #2
+  02b7 2409     [3]             BCC   L2C2 ;abs = 02c2
+  02b9 4d       [1]             TSTA  
+  02ba 270e     [3]             BEQ   L2CA ;abs = 02ca
+  02bc a101     [2]             CMP   #1
+  02be 2639     [3]             BNE   L2F9 ;abs = 02f9
+  02c0 200c     [3]             BRA   L2CE ;abs = 02ce
+  02c2          L2C2:   
+  02c2 2710     [3]             BEQ   L2D4 ;abs = 02d4
+  02c4 a103     [2]             CMP   #3
+  02c6 2631     [3]             BNE   L2F9 ;abs = 02f9
+  02c8 2012     [3]             BRA   L2DC ;abs = 02dc
+  02ca          L2CA:   
+  235:  					case 0:
+  236:  						LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_OFF; //At spec (-88)
+  02ca 1a00     [5]             BSET  5,_PTDD
+  237:  						break;
+  02cc 2002     [3]             BRA   L2D0 ;abs = 02d0
+  02ce          L2CE:   
+  238:  					case 1:
+  239:  						LED2 = LED_ON; LED3 = LED_OFF; LED4 = LED_OFF; //spec < reading < -80
+  02ce 1b00     [5]             BCLR  5,_PTDD
+  02d0          L2D0:   
+  02d0 1c00     [5]             BSET  6,_PTDD
+  02d2 2004     [3]             BRA   L2D8 ;abs = 02d8
+  02d4          L2D4:   
+  240:  						break;
+  241:  					case 2:
+  242:  						LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_OFF; //spec < reading < -60
+  02d4 1b00     [5]             BCLR  5,_PTDD
+  02d6 1d00     [5]             BCLR  6,_PTDD
+  02d8          L2D8:   
+  02d8 1e00     [5]             BSET  7,_PTDD
+  02da 201d     [3]             BRA   L2F9 ;abs = 02f9
+  02dc          L2DC:   
+  243:  						break;
+  244:  					case 3:
+  245:  						LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_ON; //reading < -40
+  02dc 1b00     [5]             BCLR  5,_PTDD
+  02de 1d00     [5]             BCLR  6,_PTDD
+  02e0 1f00     [5]             BCLR  7,_PTDD
+  246:  						break;
+  02e2 2015     [3]             BRA   L2F9 ;abs = 02f9
+  02e4          L2E4:   
+  247:  					default:
+  248:  					break;
+  249:  				}
+  250:  				//app_status = DELAY_STATE;	//Take the app state and wait for some time to retransmit.
+  251:  				app_status = TX_STATE;	//After the delay, retransmit
+  252:  				break;
+  253:  				
+  254:  			case DELAY_STATE:
+  255:  				//Sets the TX rate, small DELAY_COUNT means TX rate is fast while larger values slow it down.
+  256:          delaySymbols(packet_interval/2);
+  02e4 a601     [2]             LDA   #1
+  02e6 450000   [3]             LDHX  @packet_interval
+  02e9 cd0000   [6]             JSR   _LLSR
+  02ec 9eee04   [4]             LDX   4,SP
+  02ef 9ee603   [4]             LDA   3,SP
+  02f2 87       [2]             PSHA  
+  02f3 8a       [3]             PULH  
+  02f4 cd0000   [6]             JSR   delaySymbols
+  257:  				app_status = TX_STATE;	//After the delay, retransmit
+  258:   				break;
+  02f7 a704     [2]             AIS   #4
+  02f9          L2F9:   
+  02f9 ae05     [2]             LDX   #5
+  02fb 2070     [3]             BRA   L36D ;abs = 036d
+  02fd          L2FD:   
+  259:   				
+  260:   		   case IDLE_STATE:
+  261:  		      break;
+  262:  		      
+  263:   			
+  264:  		   case FINAL_STATE:
+  265:  
+  266:  		      LED3 = LED_ON;
+  02fd 1d00     [5]             BCLR  6,_PTDD
+  267:  		      
+  268:  		      tx_packet.pu8Data[0] = 'D';
+  02ff 9efe05   [5]             LDHX  5,SP
+  0302 a644     [2]             LDA   #68
+  0304 f7       [2]             STA   ,X
+  269:  		      tx_packet.pu8Data[1] = 'O';
+  0305 9efe05   [5]             LDHX  5,SP
+  0308 a64f     [2]             LDA   #79
+  030a e701     [3]             STA   1,X
+  270:  		      tx_packet.pu8Data[2] = 'N';
+  030c 9efe05   [5]             LDHX  5,SP
+  030f 4a       [1]             DECA  
+  0310 e702     [3]             STA   2,X
+  271:  		      tx_packet.pu8Data[3] = 'E';
+  0312 9efe05   [5]             LDHX  5,SP
+  0315 a645     [2]             LDA   #69
+  0317 e703     [3]             STA   3,X
+  272:  		      tx_packet.pu8Data[4] = 'D';
+  0319 9efe05   [5]             LDHX  5,SP
+  031c a644     [2]             LDA   #68
+  031e e704     [3]             STA   4,X
+  273:  		      tx_packet.pu8Data[5] = 'O';
+  0320 9efe05   [5]             LDHX  5,SP
+  0323 a64f     [2]             LDA   #79
+  0325 e705     [3]             STA   5,X
+  274:  		      tx_packet.pu8Data[6] = 'N';
+  0327 9efe05   [5]             LDHX  5,SP
+  032a 4a       [1]             DECA  
+  032b e706     [3]             STA   6,X
+  275:  		      tx_packet.pu8Data[7] = 'E';
+  032d 9efe05   [5]             LDHX  5,SP
+  0330 a645     [2]             LDA   #69
+  0332 e707     [3]             STA   7,X
+  276:  		      tx_packet.pu8Data[8] = '\0';
+  0334 9efe05   [5]             LDHX  5,SP
+  0337 6f08     [5]             CLR   8,X
+  277:  		      tx_packet.u8DataLength = 9;
+  0339 a609     [2]             LDA   #9
+  033b 9ee704   [4]             STA   4,SP
+  278:    		      
+  279:            (void)MLMEMC13192PAOutputAdjust(14);	//Set Nominal power setting	
+  033e a60e     [2]             LDA   #14
+  0340 cd0000   [6]             JSR   MLMEMC13192PAOutputAdjust
+  280:            
+  281:  		      for (i=0; i<20; i++) {
+  0343 9e6f07   [6]             CLR   7,SP
+  0346          L346:   
+  282:  		         for (loop = 0; loop < DELAY_COUNT; loop++);
+  0346 95       [2]             TSX   
+  0347 6f02     [5]             CLR   2,X
+  0349 6f01     [5]             CLR   1,X
+  034b          L34B:   
+  034b 6c02     [5]             INC   2,X
+  034d 2602     [3]             BNE   L351 ;abs = 0351
+  034f 6c01     [5]             INC   1,X
+  0351          L351:   
+  0351 e601     [3]             LDA   1,X
+  0353 2af6     [3]             BPL   L34B ;abs = 034b
+  283:  		         (void)MCPSDataRequest(&tx_packet);
+  0355 af03     [2]             AIX   #3
+  0357 cd0000   [6]             JSR   MCPSDataRequest
+  284:  		         app_status = FINAL_STATE;
+  035a ae09     [2]             LDX   #9
+  035c 8c       [1]             CLRH  
+  035d 960000   [5]             STHX  app_status
+  0360 95       [2]             TSX   
+  0361 6c06     [5]             INC   6,X
+  0363 e606     [3]             LDA   6,X
+  0365 a114     [2]             CMP   #20
+  0367 25dd     [3]             BCS   L346 ;abs = 0346
+  285:  		      }
+  286:  		      
+  287:  		      LED1 = LED_OFF;
+  0369 1800     [5]             BSET  4,_PTDD
+  036b          L36B:   
+  288:  		      
+  289:  		      app_status = INITIAL_STATE;
+  036b ae01     [2]             LDX   #1
+  036d          L36D:   
+  036d 8c       [1]             CLRH  
+  036e 960000   [5]             STHX  app_status
+  0371          L371:   
+  290:  		      
+  291:  			default:
+  292:  				break;
+  293:  			
+  294:  		}
+  295:  		
+  296:  		/* Check for events */
+  297:  		  
+  298:  		  /* Check for debounce timer (TIMER1) */
+  299:          if ((gu16Events & TIMER_EVENT1) != 0) {
+  0371 c60001   [4]             LDA   gu16Events:1
+  0374 a504     [2]             BIT   #4
+  0376 270a     [3]             BEQ   L382 ;abs = 0382
+  300:              gu16Events &= ~TIMER_EVENT1; /* Clear the event */
+  0378 a4fb     [2]             AND   #-5
+  037a c70001   [4]             STA   gu16Events:1
+  301:              gu16timerEvent[1] = 0; /* Turn off the timer */
+  037d 5f       [1]             CLRX  
+  037e 8c       [1]             CLRH  
+  037f 960002   [5]             STHX  gu16timerEvent:2
+  0382          L382:   
+  302:          }
+  303:         
+  304:          /* See if a RX ON Request has been made */	      
+  305:          if ((gu16Events & KBI2_EVENT) != 0) {
+  0382 c60001   [4]             LDA   gu16Events:1
+  0385 a510     [2]             BIT   #16
+  0387 271c     [3]             BEQ   L3A5 ;abs = 03a5
+  306:              #if BUZZER_ENABLED
+  307:                 BUZZER = BUZZER_ON;
+  0389 1400     [5]             BSET  2,_PTDD
+  308:              #endif
+  309:                 delay(10);
+  038b ae0a     [2]             LDX   #10
+  038d 8c       [1]             CLRH  
+  038e cd0000   [6]             JSR   delay
+  310:              #if BUZZER_ENABLED
+  311:                 BUZZER = BUZZER_OFF;
+  0391 1500     [5]             BCLR  2,_PTDD
+  312:              #endif
+  313:                 gu16Events &= ~KBI2_EVENT; /* Clear the event */
+  0393 450001   [3]             LDHX  @gu16Events:1
+  0396 f6       [3]             LDA   ,X
+  0397 a4ef     [2]             AND   #-17
+  0399 f7       [2]             STA   ,X
+  314:          	      
+  315:          	      KBI1SC |= 0x02; /* Enable Interrupts */
+  039a 1200     [5]             BSET  1,_KBI1SC
+  316:             
+  317:             // Enviar o pacote para o TX com DONEDONE na potencia maxima
+  318:             MLMERXDisableRequest();
+  039c cd0000   [6]             JSR   MLMERXDisableRequest
+  319:             
+  320:            app_status = FINAL_STATE;
+  039f ae09     [2]             LDX   #9
+  03a1 8c       [1]             CLRH  
+  03a2 960000   [5]             STHX  app_status
+  03a5          L3A5:   
+  321:          }       
+  322:  	}
+  03a5 cc0089   [4]             JMP   L89 ;abs = 0089
+  323:  }
+  324:  
+  325:  
+  326:  void MCPSDataIndication(tRxPacket *rx_packet) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7f2     [2]             AIS   #-14
+  327:  		       
+  328:  	if (rx_packet->u8Status == TIMEOUT) {
+  0004 e604     [3]             LDA   4,X
+  0006 a185     [2]             CMP   #-123
+  0008 2606     [3]             BNE   L10 ;abs = 0010
+  329:  
+  330:  		/* Put timeout condition code here */
+  331:  		
+  332:  		app_status = TX_STATE;	//If timeout occurs, simply set back to TX_STATE to transmit again.
+  000a ae05     [2]             LDX   #5
+  000c 8c       [1]             CLRH  
+  000d 960000   [5]             STHX  app_status
+  0010          L10:    
+  333:  
+  334:  	}
+  335:  
+  336:  	if (rx_packet->u8Status == SUCCESS) {	//Good packet received.
+  0010 9efe0f   [5]             LDHX  15,SP
+  0013 e604     [3]             LDA   4,X
+  0015 a177     [2]             CMP   #119
+  0017 2703     [3]             BEQ   L1C ;abs = 001c
+  0019 cc012c   [4]             JMP   L12C ;abs = 012c
+  001c          L1C:    
+  337:  
+  338:  		//Check to see if it is an "ACKx" packet....
+  339:  		if (rx_packet->pu8Data[0] == 'A' &&
+  001c 9ece02   [5]             LDHX  2,X
+  001f f6       [3]             LDA   ,X
+  0020 a141     [2]             CMP   #65
+  0022 2616     [3]             BNE   L3A ;abs = 003a
+  340:  			rx_packet->pu8Data[1] == 'C' &&
+  0024 e601     [3]             LDA   1,X
+  0026 a143     [2]             CMP   #67
+  0028 2610     [3]             BNE   L3A ;abs = 003a
+  341:  			rx_packet->pu8Data[2] == 'K') {
+  002a e602     [3]             LDA   2,X
+  002c a14b     [2]             CMP   #75
+  002e 260a     [3]             BNE   L3A ;abs = 003a
+  342:  			
+  343:  			//Good ACK packet read the power level byte
+  344:  			led_status = rx_packet->pu8Data[3];	//Store power level into global led_status
+  0030 e603     [3]             LDA   3,X
+  0032 c70000   [4]             STA   led_status
+  345:  			app_status = SET_LEDS;				//Set app_status to process the LEDs
+  0035 ae07     [2]             LDX   #7
+  346:  			
+  347:  		}
+  0037 cc0128   [4]             JMP   L128 ;abs = 0128
+  003a          L3A:    
+  348:  		else {
+  349:  		if (rx_packet->pu8Data[0] == 'S' &&
+  003a 9efe0f   [5]             LDHX  15,SP
+  003d 9ece02   [5]             LDHX  2,X
+  0040 f6       [3]             LDA   ,X
+  0041 a153     [2]             CMP   #83
+  0043 2703     [3]             BEQ   L48 ;abs = 0048
+  0045 cc0126   [4]             JMP   L126 ;abs = 0126
+  0048          L48:    
+  350:  			rx_packet->pu8Data[1] == 'T' &&
+  0048 e601     [3]             LDA   1,X
+  004a a154     [2]             CMP   #84
+  004c 2703     [3]             BEQ   L51 ;abs = 0051
+  004e cc0126   [4]             JMP   L126 ;abs = 0126
+  0051          L51:    
+  351:  			rx_packet->pu8Data[2] == 'A' &&
+  0051 e602     [3]             LDA   2,X
+  0053 a141     [2]             CMP   #65
+  0055 2703     [3]             BEQ   L5A ;abs = 005a
+  0057 cc0126   [4]             JMP   L126 ;abs = 0126
+  005a          L5A:    
+  352:  			rx_packet->pu8Data[3] == 'R' &&
+  005a e603     [3]             LDA   3,X
+  005c a152     [2]             CMP   #82
+  005e 2703     [3]             BEQ   L63 ;abs = 0063
+  0060 cc0126   [4]             JMP   L126 ;abs = 0126
+  0063          L63:    
+  353:  			rx_packet->pu8Data[4] == 'T') {
+  0063 e604     [3]             LDA   4,X
+  0065 a154     [2]             CMP   #84
+  0067 2703     [3]             BEQ   L6C ;abs = 006c
+  0069 cc0126   [4]             JMP   L126 ;abs = 0126
+  006c          L6C:    
+  354:  			// Recebeu o pacote de START
+  355:  
+  356:          UINT8 quantidadePkt[6];
+  357:          UINT8 tamanhoPkt[4];
+  358:          UINT8 intervaloPkt[4];
+  359:          UINT8 loop;
+  360:          
+  361:   		    for (loop = 0; loop < 6; loop++)
+  006c 4f       [1]             CLRA  
+  006d          L6D:    
+  362:   		      quantidadePkt[loop] = 0;
+  006d 95       [2]             TSX   
+  006e 87       [2]             PSHA  
+  006f 9f       [1]             TXA   
+  0070 9eeb01   [4]             ADD   1,SP
+  0073 87       [2]             PSHA  
+  0074 8b       [2]             PSHH  
+  0075 86       [3]             PULA  
+  0076 a900     [2]             ADC   #0
+  0078 87       [2]             PSHA  
+  0079 8a       [3]             PULH  
+  007a 88       [3]             PULX  
+  007b 7f       [4]             CLR   ,X
+  007c 95       [2]             TSX   
+  007d f6       [3]             LDA   ,X
+  007e 4c       [1]             INCA  
+  007f a106     [2]             CMP   #6
+  0081 8a       [3]             PULH  
+  0082 25e9     [3]             BCS   L6D ;abs = 006d
+  363:   		    for (loop = 0; loop < 4; loop++)
+  0084 4f       [1]             CLRA  
+  0085          L85:    
+  364:   		      tamanhoPkt[loop] = 0;
+  0085 95       [2]             TSX   
+  0086 af06     [2]             AIX   #6
+  0088 87       [2]             PSHA  
+  0089 9f       [1]             TXA   
+  008a 9eeb01   [4]             ADD   1,SP
+  008d 87       [2]             PSHA  
+  008e 8b       [2]             PSHH  
+  008f 86       [3]             PULA  
+  0090 a900     [2]             ADC   #0
+  0092 87       [2]             PSHA  
+  0093 8a       [3]             PULH  
+  0094 88       [3]             PULX  
+  0095 7f       [4]             CLR   ,X
+  0096 95       [2]             TSX   
+  0097 f6       [3]             LDA   ,X
+  0098 4c       [1]             INCA  
+  0099 a104     [2]             CMP   #4
+  009b 8a       [3]             PULH  
+  009c 25e7     [3]             BCS   L85 ;abs = 0085
+  365:   		    for (loop = 0; loop < 4; loop++)
+  009e 4f       [1]             CLRA  
+  009f          L9F:    
+  366:   		      intervaloPkt[loop] = 0;
+  009f 95       [2]             TSX   
+  00a0 af0a     [2]             AIX   #10
+  00a2 87       [2]             PSHA  
+  00a3 9f       [1]             TXA   
+  00a4 9eeb01   [4]             ADD   1,SP
+  00a7 87       [2]             PSHA  
+  00a8 8b       [2]             PSHH  
+  00a9 86       [3]             PULA  
+  00aa a900     [2]             ADC   #0
+  00ac 87       [2]             PSHA  
+  00ad 8a       [3]             PULH  
+  00ae 88       [3]             PULX  
+  00af 7f       [4]             CLR   ,X
+  00b0 95       [2]             TSX   
+  00b1 f6       [3]             LDA   ,X
+  00b2 4c       [1]             INCA  
+  00b3 a104     [2]             CMP   #4
+  00b5 8a       [3]             PULH  
+  00b6 25e7     [3]             BCS   L9F ;abs = 009f
+  367:  			
+  368:          quantidadePkt[0] = rx_packet->pu8Data[5];
+  00b8 9efe0f   [5]             LDHX  15,SP
+  00bb 9ece02   [5]             LDHX  2,X
+  00be e605     [3]             LDA   5,X
+  00c0 9ee701   [4]             STA   1,SP
+  369:          quantidadePkt[1] = rx_packet->pu8Data[6];
+  00c3 e606     [3]             LDA   6,X
+  00c5 9ee702   [4]             STA   2,SP
+  370:          quantidadePkt[2] = rx_packet->pu8Data[7];
+  00c8 e607     [3]             LDA   7,X
+  00ca 9ee703   [4]             STA   3,SP
+  371:          quantidadePkt[3] = rx_packet->pu8Data[8];
+  00cd e608     [3]             LDA   8,X
+  00cf 9ee704   [4]             STA   4,SP
+  372:          quantidadePkt[4] = rx_packet->pu8Data[9];
+  00d2 e609     [3]             LDA   9,X
+  00d4 9ee705   [4]             STA   5,SP
+  373:  
+  374:          tamanhoPkt[0] = rx_packet->pu8Data[10];
+  00d7 e60a     [3]             LDA   10,X
+  00d9 9ee707   [4]             STA   7,SP
+  375:          tamanhoPkt[1] = rx_packet->pu8Data[11];
+  00dc e60b     [3]             LDA   11,X
+  00de 9ee708   [4]             STA   8,SP
+  376:          tamanhoPkt[2] = rx_packet->pu8Data[12];
+  00e1 e60c     [3]             LDA   12,X
+  00e3 9ee709   [4]             STA   9,SP
+  377:          
+  378:          intervaloPkt[0] = rx_packet->pu8Data[13];
+  00e6 e60d     [3]             LDA   13,X
+  00e8 9ee70b   [4]             STA   11,SP
+  379:          intervaloPkt[1] = rx_packet->pu8Data[14];
+  00eb e60e     [3]             LDA   14,X
+  00ed 9ee70c   [4]             STA   12,SP
+  380:          intervaloPkt[2] = rx_packet->pu8Data[15];
+  00f0 e60f     [3]             LDA   15,X
+  00f2 9ee70d   [4]             STA   13,SP
+  381:          
+  382:  			  packet_number = String2Uint32(quantidadePkt);
+  00f5 450000   [3]             LDHX  @packet_number
+  00f8 89       [2]             PSHX  
+  00f9 8b       [2]             PSHH  
+  00fa 95       [2]             TSX   
+  00fb af02     [2]             AIX   #2
+  00fd cd0000   [6]             JSR   String2Uint32
+  0100 a702     [2]             AIS   #2
+  383:  			  packet_size = String2Uint32(tamanhoPkt);
+  0102 450000   [3]             LDHX  @packet_size
+  0105 89       [2]             PSHX  
+  0106 8b       [2]             PSHH  
+  0107 95       [2]             TSX   
+  0108 af08     [2]             AIX   #8
+  010a cd0000   [6]             JSR   String2Uint32
+  010d a702     [2]             AIS   #2
+  384:  			  packet_interval = String2Uint32(intervaloPkt);
+  010f 450000   [3]             LDHX  @packet_interval
+  0112 89       [2]             PSHX  
+  0113 8b       [2]             PSHH  
+  0114 95       [2]             TSX   
+  0115 af0c     [2]             AIX   #12
+  0117 cd0000   [6]             JSR   String2Uint32
+  011a a702     [2]             AIS   #2
+  385:  
+  386:          app_status = START_RECEIVED;	
+  011c ae0b     [2]             LDX   #11
+  011e 8c       [1]             CLRH  
+  011f 960000   [5]             STHX  app_status
+  387:  				LED4 = LED_ON;
+  0122 1f00     [5]             BCLR  7,_PTDD
+  388:  			} else {
+  0124 2006     [3]             BRA   L12C ;abs = 012c
+  0126          L126:   
+  389:  			  
+  390:  			//A good packet was received but it is not the ack packet we want.
+  391:  			//Whenever a good packet is received the radio will default back to idle, so
+  392:  			//retransmit by setting state variable to TX_STATE.  This resets the machine.
+  393:  			app_status = TX_STATE;
+  0126 ae05     [2]             LDX   #5
+  0128          L128:   
+  0128 8c       [1]             CLRH  
+  0129 960000   [5]             STHX  app_status
+  012c          L12C:   
+  394:  			}
+  395:  		}
+  396:  	}		
+  397:  
+  398:  }
+  012c a710     [2]             AIS   #16
+  012e 81       [6]             RTS   
+  399:  
+  400:  void MLMEMC13192ResetIndication() {
+  401:  	//Notifies you that the MC13192 has been reset.
+  402:  	//Application must handle this here.
+  403:  
+  404:  	app_status = RESET_STATE;	//MC13192 reset, re-initialize.
+  0000 ae02     [2]             LDX   #2
+  0002 8c       [1]             CLRH  
+  0003 960000   [5]             STHX  app_status
+  405:  
+  406:  }
+  0006 81       [6]             RTS   
+  407:  
+  408:  void app_init() {
+  409:    
+  410:    
+  411:    /* Init LED's 1-OFF 0-ON */
+  412:  	LED1 = 1; /* Default is off */
+  0000 1800     [5]             BSET  4,_PTDD
+  413:  	LED2 = 1;
+  0002 1a00     [5]             BSET  5,_PTDD
+  414:  	LED3 = 1;
+  0004 1c00     [5]             BSET  6,_PTDD
+  415:  	LED4 = 1;
+  0006 1e00     [5]             BSET  7,_PTDD
+  416:  	
+  417:  	LED1DIR = 1; /*Set the DDIR register as Outputs for the LED pins*/
+  0008 1800     [5]             BSET  4,_PTDDD
+  418:  	LED2DIR = 1;
+  000a 1a00     [5]             BSET  5,_PTDDD
+  419:  	LED3DIR = 1;
+  000c 1c00     [5]             BSET  6,_PTDDD
+  420:  	LED4DIR = 1;
+  000e 1e00     [5]             BSET  7,_PTDDD
+  421:  	
+  422:  	/* Set Push button pull ups */
+  423:  	PB0PU = 1;
+  0010 1400     [5]             BSET  2,_PTAPE
+  424:  	PB1PU = 1;
+  0012 1600     [5]             BSET  3,_PTAPE
+  425:  	PB2PU = 1;
+  0014 1800     [5]             BSET  4,_PTAPE
+  426:  	PB3PU = 1;
+  0016 1a00     [5]             BSET  5,_PTAPE
+  427:  
+  428:    /* OTAP entry */
+  429:    #if SMAC_FEATURE_OTAP == TRUE
+  430:    if (PB0 == 0){
+  431:      KBI1SC = 0x00; /* Turn On Interrupts */
+  432:      OTAPActivate();
+  433:    }
+  434:    #endif // SMAC_FEATURE_OTAP == TRUE
+  435:    
+  436:     /* Setup Timer 1 */
+  437:       /* Setup Timer 1 */
+  438:    TPM1MOD = 1; /* Set the timer for a 26ms timer rate (1/8E6) * 128 * 625 = 10msec */
+  0018 ae01     [2]             LDX   #1
+  001a 8c       [1]             CLRH  
+  001b 3500     [5]             STHX  _TPM1MOD
+  439:                   /* Timer rate = (1/BUSCLOCK) * TIMER_PRESCALER * TIMER MOD */
+  440:    TPM1SC = 0x4F; /* Timer divide by 128. (16uS timebase for 8MHz bus clock). interrupt on*/
+  001d 6e4f00   [4]             MOV   #79,_TPM1SC
+  441:  	
+  442:  }
+  0020 81       [6]             RTS   

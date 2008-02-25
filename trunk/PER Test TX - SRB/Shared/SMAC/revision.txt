@@ -1,0 +1,176 @@
+Revision History for SMAC
+
+Version 4_2
+-Added Over the Air Programming module
+-Added Repeater application (for the extension of the range of a star or point to point network)
+-Added Protocol Test Client application for interaction with TestTool
+-Added the following transceiver sequences as primitives:
+xx
+xx
+xx
+-Added an optional security module
+-Bugs corrected
+
+
+Version 4_1c
+-Included support for Toroweap
+-Added MLMEScanRequest for CCA functionality
+-Corrected bugs
+
+Version 4_1a
+-Ported SMAC to the following platforms:
+ S08R family
+ S12  (examples for C32)
+-Enable SMAC to be ported to Coldfire and DSC
+-Corrected a Doze with Timeout bug
+ 
+Version 4_1
+-Changes to SMAC to make it MCU Agnostic and ease the ports to other architectures (including the creation of mcu_spi_config.c and mcu_spi_config.h to hold all the SPI functions)
+-Folder Structure changed, in order to ease the distribution and maintenance of the ports of SMAC to other architectures.  Thus, the access paths for the projects were also changed.
+-Source code standarization. The names of data types, functions and variables were changed.
+-The Non volatile memory production data was changed to represent a generic SMAC application, not only the Wireless UART.
+-The MC13192 initialization changed to adhere to the mandatory register initialization (MC13192 Reference Manual section 2.2).
+-Byte codes filter was added to the transmission and reception. IRQIsr, RAMDrvReadRx and RAMDrvWriteTx in drivers.c were changed. Refer to SMACRM document for further information.
+-Addition of 2 new applications: Simple Network (which can be a startup for implementing star networks) and Test Modes app (which is used to evaluate the MC1319x)
+
+SMAC 4.0:
+- To support both 3_0 and 3_1 of the MW CW IDE for HC08 the main files have been duplicated and placed into separate folders.
+	If you are using the Metrowerks Codewarrior Version 3_0 IDE than use the 3_0 ide directory
+	otherwise if using IDE 3_1 then use IDE 3_1.
+
+- The path to the PRM linker file was sometimes a absolute path.  Changed all PRM reference in the
+	linker control panel for each app and each target to reference the Bootloader linker file
+	in the {smac}/apps/common/linker files directory.  Also, if there is just a filename with 
+	no path in the linker file input box then the access paths are searched.  That being the case
+	the /common/linker file directory was added to the access paths.
+
+- the Select MCU target output libs for the "embedded bootloader" referenced an outdated name.  It was changed
+	to x_loader.lib
+
+- On my development system, S19's and map files were being created but the generate s19 and 
+	map file selector in the Linker options were not selected.  Changed all projects to 
+	create a map file (-M) and s19 file (-B).  Also, The -EnvSRECORD=S19 was added to ensure 
+	that the srecord extenion was S19.
+
+- Cleaned up the project windows
+	 SMAC libs are now placed in the SMAC group in the Project window
+	 Select MCU target libs are now placed in the Select MCU Target group in the Project window
+- Noticed that the Lighting demo on the GB60 needs the J7 jumper on the daughtercard to be in 
+	Position 1-2 for the KBI function to work correctly.  This needs to be looked into.
+- The bootloader is not loading on some Axiom0308's. Look for further clarifications and corrections in the future.
+- Changed the SMAC Group in the master builder projects to "library builds"
+
+SMAC 3_0d:
+- added a test outline to show what I have done to test this release.
+- added tools folder to SMAC distribution for Bootloader info and S19's.
+- Changed the ordering of the LEDs in the Light Demo Application because the LED to Pushbutton
+	mapping was reversed.
+- added Bootloader compatibility (uart runs at 19200) as the Bus clock is halved with Bootloader
+	Can be changed.  See the MC13192FLUG/D for more information.
+- added PA control support
+- Created 13192EVB targets in all appplications and in the SMAC project as well.
+- added another sub-project that includes the correct mcu C file allocation.  Allows users to choose
+	GB60, GT60 from the sub project.
+- Moved the IDE 3.1 header file from the <system> folder into the Target Project locally.  This
+	will allow both IDE 3.0 and 3.1 to interoperate.  Also added target to all access paths.
+- Removed the HW_compatiablility test from the smac.  Now the mc13192_init() function returns void.
+	This was removed since previous version of the RFIC (2.0 and ealier)
+	had incompatiable SPI port settings.  This renders the hardware check unreliable.
+	The application can check the rfic_version via the smac api.
+- updated the SMAC to support the new IDE 3.1 header file definitions.
+- Eliminated the BETA label and the 4 from the SMAC title.
+- Corrected the MLME_MC13192_PA_output_adjust() function to mask out the correct bits and
+apply the requested power 0xXX{REQUESTED_POWER}c for 0-15 values.
+- Removed the revision.txt link from in the project.
+- Added a target for the I_BOARD in device_header.
+- Added the ANTENNA_SWITCH compiler option.
+	*This added a change to the mcu_hw_config.c (init_gpio) that added init code.
+	*PLME_set_trx_state_request added the 
+		MC13192_RX_SWITCH = x;
+		MC13192_TX_SWITCH = x;
+
+
+Some users were experiencing out of reset lock up issues on the tests.  We believe that debounce
+	on the reset line is causing the mcu and 13192 RFIC to behave in a manner not covered by the SMAC.
+	This is an attempt to fix that issue.
+-Added a delay ~50ms to the mcu_init mcu_hw_config.c out of reset to account for reset debounce */
+-Added a check to the IRQ pin that checks 13192 for an ATTN_IRQ.  If out of reset the IRQ is asserted but the 13192
+	status register does not show ATTN_IRQ as the source.  Our software will ignore the current IRQ and wait for a true
+	ATTN_IRQ.
+
+Applications:
+PER- For some reason the PER test with the 3.1 IDE broke.  It failed when the IDEAL went from TX to RX and DUT went from RX-TX.
+	The DUT would never get the ack.  So it kept sending channel request over and over.  This caused the IDEAL to keep
+	echoing to the UART IDEAL-RX 0 over and over.
+
+	The work around that I have found is to disable "TREE" optimizers for each of the PER Projects.
+	With this feature disabled in the IDE the code executes fine.  Does anyone know what tree optimization is?
+
+PER- Renamed the project and folder to highlight this is not a range test because the PER is done at MIN_POWER.
+	
+
+SMAC Beta 4c:
+- Added h files back to the SMAC.
+- Removed the ARD target from the SMAC 3_0 build
+- Removed the 4k projects for PER and lighting since >4k.
+- Removed the PER and lighting 4k projects from master build project
+
+SMAC Beta 4a:
+- Added new 4k projects for each application to support the Special Edition of the Metrowerks
+	IDE.
+- Added the 4k projects to the "Master" project builder.
+
+SMAC Beta 4:
+- Added the LED port directions before all MC13192_init().
+- Added the hw compatiablity test to all apps.
+- Changed the axiom refences to GB60-EVB
+- Changed the output file names to match the app name
+	for example, PER dut target for GB60 --> per_dut_axiomC.abs
+	should fix some issues with the code not updating
+
+- Added the PER to the apps and removed the bst tests.  Will be put in future release.
+- Some apps still used the TARGET as a label fixed that.
+- inlcuded "mc13192_hw_config.h" into each application for the MC13192_init() function which
+	caused all hw to run since the ERROR was not being past back correctly.
+- Cleaned out all extra .abs files.
+
+SMAC Beta 2:
+
+-Added smac_{target}_3_0.lib to all smac target builds.
+-Added smac_MC13192SARD.lib library for MC13192SARD
+-Added MLME_get_rfic_version
+	returns 3=2.2, 2=2.1, 1=2.0, 0=1.2
+
+-Added PLME_get_rfic_version
+
+MC13192_regs.h
+-Added GPIO_CONFIG defintion
+-Added GPIO_DATA	defintion
+-Added GPIO_DATA_MASK definition
+
+Applications:
+
+ALL APPS:
+-Added a HW detect feature that checks to see if your SMAC can run on your HW.
+	SMAC has a SMAC_HW_VERSION bit field that defines which version of smac should run on
+	what hardware.
+
+	For example, If you want smac to run on 2.2 only then HW_version = 8 or 2^3.
+	If you want smac to run on 2.1 only then HW_version = 4 or 2^2.
+	If you want smac to run on 2.2 & 2.1 only then HW_version = 12 or 2^3 + 2^2.
+
+	The smac MC13192_init checks the version of HW and returns ERROR if the app cannot run.
+	SUCCESS if it can. If it fails it will flash all 4 leds quickly.
+
+-Put multple Targets into all applications where appropriate.
+-Added MASTER Build project to the applications.  This project can build all applications
+-Moved old apps into "Old files" folder.  Remove when released.
+
+PER:
+Replace Packet Error Rate with Basic System Tests.mcp
+- Does PER
+- CW TX
+- Toggles Modulation
+- Sets a channel
+- Sets a power level
+etc.

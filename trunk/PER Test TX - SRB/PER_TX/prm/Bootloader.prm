@@ -1,0 +1,149 @@
+/************************************************************************************
+* This file contains some basic linker parameters.
+*
+* The linker file is made so it matches architecture for the Freescale HCS08 GB60/GT60 ucontroller
+* to be used in the 802.15.4/Zigbee project. 
+* 
+* This version must be used if fixed addresses (Version string "FS EB..") Embedded Bootloader from version 5.00 is on the board.
+* Use other linker file if you have an older version of the Embedded Bootloader (freeloader) versions before 5.00 or
+* a version which uses dynamic memory (Version string "FS DEB..")
+*
+* Author(s):  Michael V. Christensen
+*
+* (c) Copyright 2005, Freescale Semiconductor, Inc. All rights reserved.
+*
+* Freescale Confidential Proprietary
+* Digianswer Confidential
+*
+* No part of this document must be reproduced in any form - including copied,
+* transcribed, printed or by any electronic means - without specific written
+* permission from Freescale.
+*
+* Last Inspected: 11-10-05
+* Last Tested:
+*
+************************************************************************************/
+
+NAMES
+// Do not remove this block/section.
+// Description: The NAMES block contains a list of binary files building the application. This block
+// is mandatory and can only be specified once in a prm file.
+// Additional files may be specified by the option -Add. The object files specified with the option
+// -Add are linked before the files mentioned in the NAMES block. With the option -Add, additional
+// files can be added to a project without modifying the link parameter file.
+// If all binary files should be specified by the command line option -add, then an empty NAMES
+// block (just NAMES END) must be present in the link parameter file. Object files added with this
+// option are linked before the object files specified in the NAMES block.
+END
+
+// **************************************************************************
+
+// Memory map for HCS08 GB60/GT60. All memory areas are define below i.e. registers and stack etc.
+// are shown.
+
+// Options
+// READ_WRITE	is for normal variables
+// READ_ONLY	is for const variables and code
+// NO_INIT	is for uninitialized variables.
+// Note!
+// "RES_" means that the system is not allowed to use the specified memory.
+
+SECTIONS
+    // Port registers
+    DIRECT_PAGE_REGISTERS       = READ_WRITE 0x0000 TO 0x007F; // HW registers - This section contains often used port registers
+
+    // Fast direct addressable memory
+    DIRECT_ADDRESSING_MEMORY    = READ_WRITE 0x0080 TO 0x00FE; // "Fast" RAM memory
+
+    SLEEP_VARIABLE_RAM          = READ_WRITE 0x00FF TO 0x0100; // "Fast" RAM memory
+    // 802.15.4/App. stack memory
+    APP_STACK_RAM               = READ_WRITE 0x0101 TO 0x02C0; // RAM memory
+
+    // 802.15.4/App. general memory
+    APP_RAM                     = READ_WRITE 0x02C1 TO 0x0F6F; // RAM memory
+
+    // Reserve space for NV RAM pointer - used by BootLoader of 802.15.4/App
+    // The pointer is initialized by code.
+    NV_RAM_POINTER_RAM          = NO_INIT    0x0F70 TO 0x0F71; // RAM memory
+
+    // Bootloader NV functions data - 802.15.4/App MUST NOT reuse memory.
+    RES_BOOTLOADER_NV_RAM       = READ_WRITE 0x0F72 TO 0x0F7F; // RAM memory
+
+    // BootLoader from version 5.00 NV functions (critical part) - 802.15.4/App MUST NOT reuse memory.
+    RES_FLASH_LIB_CODE_RAM      = NO_INIT    0x0F80 TO 0x0FB9; // RAM memory
+
+    //Data memory for 802.15.4/application.
+    APP_RAM2                    = READ_WRITE 0x0FBA TO 0x106E; // RAM memory
+  
+    // BootLoader static variables - 802.15.4/App MUST NOT reuse memory.
+    RES_BOOTLOADER_VARIABLES    = NO_INIT	 0x106F TO 0x107F;  // RAM memory
+
+    // 802.15.4/App. startup structure flash memory
+    APP_STARTUP_STRUC_FLASH     = READ_ONLY 0x01080 TO 0x10AF; // Flash memory
+
+    // 802.15.4/App. flash memory - section 1
+    APP_CODE                    = READ_ONLY 0x010B0 TO 0x13FF; // Flash memory
+
+    // BootLoader/802.15.4/App. NV RAM flash memory.
+    // Initialized by 802.15.4.
+    
+    BOOTLOADER_COPYRIGHT_NV_RAM0 = READ_ONLY 0x01400 TO 0x1435; // Flash memory
+    BOOTLOADER_FIRMWARE_NV_RAM0  = READ_ONLY 0x01436 TO 0x145B; // Flash memory
+    BOOTLOADER_MCU_NV_RAM0       = READ_ONLY 0x0145C TO 0x145D; // Flash memory
+    BOOTLOADER_MAC_NV_RAM0       = READ_ONLY 0x0145E TO 0x148C; // Flash memory
+    //BOOTLOADER_MAC_NV_RAM0      = READ_ONLY 0x01400 TO 0x148C; // Flash memory
+    BOOTLOADER_PHY_NV_RAM0      = READ_ONLY 0x0148D TO 0x14BB; // Flash memory
+    BOOTLOADER_APP_NV_RAM0      = READ_ONLY 0x014BC TO 0x15FF; // Flash memory
+    BOOTLOADER_APP_NV_RAM1      = NO_INIT   0x01600 TO 0x17FF; // Flash memory (erased)
+
+    //High page registers
+    HIGH_PAGE_REGISTERS         = READ_WRITE 0x1800 TO 0x182B; // HW registers - High page register section
+
+    // 802.15.4/App. flash memory - section 2
+    APP_CODE_2                  = READ_ONLY 0x0182C TO 0xEFBF; // Flash memory
+
+    // 802.15.4/application redirected ISR vector table
+    APP_VECTORS_FLASH           = READ_ONLY 0x0EFC0 TO 0xEFFD; // Flash memory
+    
+    // Interface flags - MUST be access with NV flash routines
+    APP_BOOTLOADER_FLAGS_FLASH  = READ_ONLY 0x0EFFE TO 0xEFFF;  // Flash memory
+    
+    // 802.15.4/App. is not allowed to use the below memory
+    // BootLoader NV function ptr. available for 802.15.4/App.
+    // 802.15.4/App. can call these functions
+    RES_CONST_FUNC_PTR_FLASH    = READ_ONLY  0xF000 TO 0xF00F;
+    RES_CONST_ILL_OPCODE_FLASH  = READ_ONLY  0xF010 TO 0xF013; // For illegal opcode and pointer
+
+    // Map if Bootloader from version 5.00 is used.
+    RES_BOOTLOADER_NV_CODE      = READ_ONLY  0xF014 TO 0xF050; // NV function to copy to RAM memory
+    RES_BOOTLOADER_CODE         = READ_ONLY  0xF051 TO 0xFFAF; // Bootloader code section in flash
+    RES_NV_REGISTERS_FLASH      = READ_ONLY  0xFFB0 TO 0xFFBF; // None-volatile registers
+    RES_IRQ_VECTORS_TABLE_FLASH = READ_ONLY  0xFFC0 TO 0xFFFD; // ISR vectors
+
+    // Note! 802.15.4/App. does not have its own reset vector.
+    RES_RESET_VECTOR_FLASH	    = READ_ONLY  0xFFFE TO 0xFFFF; // System reset vector
+END
+
+// **************************************************************************
+
+// Here it is listed how the variables and code must be allocated.
+PLACEMENT
+    MY_ZEROPAGE                 INTO DIRECT_ADDRESSING_MEMORY;
+    DEFAULT_RAM                 INTO DIRECT_ADDRESSING_MEMORY, APP_RAM, APP_RAM2;
+    DEFAULT_ROM                 INTO APP_CODE, APP_CODE_2;
+    .startData                  INTO APP_STARTUP_STRUC_FLASH;
+    SLEEP_VARIABLE              INTO SLEEP_VARIABLE_RAM;
+    NV_RAM_POINTER              INTO NV_RAM_POINTER_RAM;
+    BOOTLOADER_COPYRIGHT_NV_DATA0 INTO BOOTLOADER_COPYRIGHT_NV_RAM0;
+    BOOTLOADER_FIRMWARE_NV_DATA0  INTO BOOTLOADER_FIRMWARE_NV_RAM0;
+    BOOTLOADER_MCU_NV_DATA0       INTO BOOTLOADER_MCU_NV_RAM0;
+    BOOTLOADER_MAC_NV_DATA0     INTO BOOTLOADER_MAC_NV_RAM0;
+    BOOTLOADER_PHY_NV_DATA0     INTO BOOTLOADER_PHY_NV_RAM0;
+    BOOTLOADER_APP_NV_DATA0     INTO BOOTLOADER_APP_NV_RAM0;
+    BOOTLOADER_APP_NV_DATA1     INTO BOOTLOADER_APP_NV_RAM1;
+    SSTACK                      INTO APP_STACK_RAM;
+    IRQ_VECTOR_SECTION	        INTO APP_VECTORS_FLASH;
+    APP_BOOTLOADER_FLAGS        INTO APP_BOOTLOADER_FLAGS_FLASH;
+END
+
+// **************************************************************************

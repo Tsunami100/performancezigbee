@@ -1,0 +1,997 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /*!
+    2:   * \mainpage SMAC 4.1a
+    3:   * 
+    4:   * Copyright (c) 2004, Freescale Semiconductor
+    5:   *
+    6:   * Freescale Confidential Proprietary
+    7:   *
+    8:   * \b Project: SMAC (Simple Media Access Controller)
+    9:   *
+   10:   * \b Department: Freescale Radio Products Division
+   11:   *
+   12:   
+   13:  
+   14:   */
+   15:   
+   16:  /*!
+   17:   * \file simple_mac.c
+   18:   *
+   19:   * \brief  This is the SMAC C code for the MAC layer  
+   20:   * 
+   21:   * \author a19259
+   22:   * 
+   23:   * \version 4.1a
+   24:   *
+   25:   * \date 2005/07/29 02:27:50 
+   26:   *
+   27:   * \b Description: This is the SMAC C source media (i.e. MAC) layer file for
+   28:   *                  the HC(S)08 MCU and MC13192 transceiver.
+   29:   *                  The SMAC MAC is the highest layer of C code for the SMAC.*
+   30:   *
+   31:  
+   32:   * \b Department: Freescale Radio Products Division 
+   33:   *
+   34:   * \b Project: SMAC (Simple Media Access Controller) 
+   35:   *
+   36:   * \b History: 
+   37:   * - 16/11/2005 Doc. update to Doxygen compliant by Laura Delgado r12370c
+   38:   * 
+   39:   */
+   40:  
+   41:  #include "pub_def.h"
+   42:  #include "drivers.h"       
+   43:  #include "simple_phy.h"
+   44:  #include "simple_mac.h"
+   45:  #include "MC13192_regs.h"
+   46:  
+   47:  /* Externals */ 
+   48:  extern tRxPacket *psDrvRxPacket;//!< Where the packet received will be stored 
+   49:  extern UINT8 gu8RTxMode;        //!< Global mode mirror. MC13192 Status.  
+   50:  extern tPhyOptions *psPhyOptions;
+   51:  /* Version string to put in NVM. Note! size limits */
+   52:  /* Normally it shoud be enough to change the version numbers. */
+   53:  #define Database_Label_Version  "1.00"
+   54:  #define MAC_Version             "4.20"
+   55:  #define MAC_Label               "SMAC "
+   56:  #define SMAC_VerComplete        "MAC " MAC_Label " Ver " MAC_Version " Build: " __DATE__ " " __TIME__
+   57:  #define SMAC_VerSize            sizeof(SMAC_VerComplete)
+   58:  
+   59:  
+   60:  #if defined (HCS08G) | defined (HCS08R)
+   61:  #pragma MESSAGE DISABLE C3303   /* 
+   62:                                   * Warning C3303: Implicit concatenation of 
+   63:                                   * strings 
+   64:                                   */
+   65:  #pragma MESSAGE DISABLE C4200   /* 
+   66:                                   * Warning C4200: Other segment than in 
+   67:                                   * previous declaration
+   68:                                   */
+   69:  
+   70:  #pragma CONST_SEG BOOTLOADER_MAC_NV_DATA0
+   71:  #endif
+   72:  
+   73:  
+   74:  
+   75:  /* DO NOT CHANGE OR REMOVE */
+   76:  /* These strings will be located in the NV RAM0 section.*/
+   77:  /* Note!!Check that items are location in the same sequence as specified. */
+   78:  const unsigned char Freescale_Copyright[54] = "(c) Copyright 2004 Freescale Inc. All rights reserved";
+   79:  const unsigned char Firmware_Database_Label[40] = {"DB Label: SMAC4.1c 1321x 1319xVer " Database_Label_Version};
+   80:  const unsigned char SMAC_Version[SMAC_VerSize] =  SMAC_VerComplete;
+   81:  
+   82:  #if defined (HCS08G) | defined (HCS08R)
+   83:  #pragma CONST_SEG DEFAULT
+   84:  #endif
+   85:  
+   86:  /*!
+   87:   * \fn UINT8 MCPSDataRequest (tTxPacket *psTxPacket)
+   88:   *
+   89:   * \brief Transmit data packet
+   90:   *
+   91:   * \param *psTxPacket packet pointer
+   92:   *
+   93:   * \return Status
+   94:   */
+   95:  UINT8 MCPSDataRequest(tTxPacket *psTxPacket)
+   96:  {
+   97:      UINT8 u8Status;
+   98:      
+   99:      /* Send it to the phy for processing */
+  100:      u8Status = PDDataRequest(psTxPacket);
+  0000 cc0000   [4]             JMP   PDDataRequest
+  101:      return u8Status;
+  102:  }
+  103:  
+  104:  /*
+  105:   * MCPSDataIndication : Receive data packet indication
+  106:   *
+  107:   * Parameters : Data packet pointer
+  108:   *
+  109:   * Return : None
+  110:   *
+  111:   * Notes : This function return should be located in the application 
+  112:   */
+  113:  
+  114:  
+  115:  /*!
+  116:   * \fn UINT8 MLMEHibernateRequest(void)
+  117:   *
+  118:   * \brief Hibernate the MC13192 (very low current, no CLKO)
+  119:   *
+  120:   * \return Status
+  121:   */
+  122:  
+  123:  UINT8 MLMEHibernateRequest(void)
+  124:  {
+  125:      UINT8 u8Status = 0;
+  126:      
+  127:      u8Status = PLMEHibernateRequest();
+  0000 cc0000   [4]             JMP   PLMEHibernateRequest
+  128:      return u8Status;
+  129:  }
+  130:  
+  131:  
+  132:  
+  133:  /*!
+  134:   * \fn UINT8 MLMEDozeRequest(UINT32 u32Timeout)
+  135:   *
+  136:   * \brief Doze the MC13192 (Low current, CLKO <= 1MHz)
+  137:   *
+  138:   * \param u32Timeout 32-bit time period
+  139:   * 
+  140:   * \return Status
+  141:   */
+  142:  
+  143:  UINT8 MLMEDozeRequest(UINT32 u32Timeout)
+  144:  {
+  145:      UINT8 u8Status = 0;
+  146:      
+  147:      u8Status = PLMEDozeRequest(u32Timeout);
+  0000 9efe05   [5]             LDHX  5,SP
+  0003 89       [2]             PSHX  
+  0004 8b       [2]             PSHH  
+  0005 9efe05   [5]             LDHX  5,SP
+  0008 89       [2]             PSHX  
+  0009 8b       [2]             PSHH  
+  000a cd0000   [6]             JSR   PLMEDozeRequest
+  000d a704     [2]             AIS   #4
+  148:      return u8Status;
+  149:  }
+  000f 81       [6]             RTS   
+  150:  
+  151:  /*!
+  152:   * \fn UINT8 MLMEWakeRequest(void)
+  153:   *
+  154:   * \brief Wake the MC13192 from Hibernate or Doze
+  155:   *
+  156:   * \return Status
+  157:   */
+  158:  
+  159:  UINT8 MLMEWakeRequest(void)
+  160:  {
+  161:      UINT8 u8Status = 0;
+  162:      if (gu8RTxMode == DOZE_MODE || gu8RTxMode == HIBERNATE_MODE)
+  0000 c60000   [4]             LDA   gu8RTxMode
+  0003 418204   [4]             CBEQA #-126,LA ;abs = 000a
+  0006 a181     [2]             CMP   #-127
+  0008 2605     [3]             BNE   LF ;abs = 000f
+  000a          LA:     
+  163:      {
+  164:          u8Status = PLMEWakeRequest();
+  000a cd0000   [6]             JSR   PLMEWakeRequest
+  165:          return u8Status;
+  000d 2002     [3]             BRA   L11 ;abs = 0011
+  000f          LF:     
+  166:      }
+  167:      return ERROR;
+  000f a601     [2]             LDA   #1
+  0011          L11:    
+  168:  }
+  0011 81       [6]             RTS   
+  169:  
+  170:   
+  171:   /*!
+  172:   * \fn UINT8 MLMESetChannelRequest(UINT8 u8Channel)
+  173:   *
+  174:   * \brief Set the MC13192 operating channel
+  175:   *
+  176:   * \param u8Channel Channel number (0-15)   \n
+  177:   * Channel frequencies :                    \n
+  178:   *  0 : 2.405GHz                            \n
+  179:   *  1 : 2.410GHz                            \n
+  180:   *  2 : 2.415GHz                            \n
+  181:   *  3 : 2.420GHz                            \n
+  182:   *  4 : 2.425GHz                            \n
+  183:   *  5 : 2.430GHz                            \n
+  184:   *  6 : 2.435GHz                            \n
+  185:   *  7 : 2.440GHz                            \n
+  186:   *  8 : 2.445GHz                            \n
+  187:   *  9 : 2.450GHz                            \n
+  188:   *  10: 2.455GHz                            \n
+  189:   *  11: 2.460GHz                            \n
+  190:   *  12: 2.465GHz                            \n
+  191:   *  13: 2.470GHz                            \n
+  192:   *  14: 2.475GHz                            \n
+  193:   *  15: 2.480GHz                            \n
+  194:   *                                          
+  195:   * \return Status                           
+  196:   */                                         
+  197:  UINT8 MLMESetChannelRequest(UINT8 u8Channel)
+  198:  {
+  199:      UINT8 u8Status = 0;
+  200:      
+  201:      u8Status = PLMESetChannelRequest(u8Channel);
+  0000 cc0000   [4]             JMP   PLMESetChannelRequest
+  202:      return u8Status;
+  203:  }
+  204:  
+  205:  
+  206:  /*!
+  207:   * \fn UINT8 MLMERXEnableRequest(tRxPacket *psRxPacket, UINT32 u32Timeout)
+  208:   *
+  209:   * \brief Set the MC13192 receiver ON (with optional timeout)
+  210:   *
+  211:   * \param *psRxPacket Packet pointer for received data
+  212:   * \param u32Timeout timeout
+  213:   * 
+  214:   * \note Timeout of 0 disables the timeout.
+  215:   * The actual timeout period is the timeout value times the MC13192 timer rate
+  216:   * from MLMESetMC13192TmrPrescale.
+  217:   * \return Status
+  218:   */
+  219:  
+  220:  UINT8 MLMERXEnableRequest(tRxPacket *psRxPacket, UINT32 u32Timeout)
+  221:  {
+  222:      UINT8 u8Status = 0;
+  223:      
+  224:      psDrvRxPacket = psRxPacket;      /* Assign the rx_packet to SMAC global. */
+  0000 9efe07   [5]             LDHX  7,SP
+  0003 960000   [5]             STHX  psDrvRxPacket
+  225:      if (u32Timeout == 0) {          /* Timeout disabled */
+  0006 95       [2]             TSX   
+  0007 e605     [3]             LDA   5,X
+  0009 ea04     [3]             ORA   4,X
+  000b ea03     [3]             ORA   3,X
+  000d ea02     [3]             ORA   2,X
+  000f 2604     [3]             BNE   L15 ;abs = 0015
+  226:          /* Just enable the receiver */
+  227:          u8Status = PLMESetTrxStateRequest(RX_MODE);
+  0011 a602     [2]             LDA   #2
+  228:      }
+  0013 201b     [3]             BRA   L30 ;abs = 0030
+  0015          L15:    
+  229:      else {
+  230:          /* Timeout requested. Get the current time and add the timeout value. */
+  231:          /* Erratum: In order to avoid the missing Irq, we reset the timer1 */
+  232:          PLMESetTimeRequest(0x00000000);
+  0015 4f       [1]             CLRA  
+  0016 87       [2]             PSHA  
+  0017 87       [2]             PSHA  
+  0018 87       [2]             PSHA  
+  0019 87       [2]             PSHA  
+  001a cd0000   [6]             JSR   PLMESetTimeRequest
+  001d a704     [2]             AIS   #4
+  233:          u8Status = PLMEEnableMC13192Timer1(u32Timeout);        /* 
+  001f 9efe05   [5]             LDHX  5,SP
+  0022 89       [2]             PSHX  
+  0023 8b       [2]             PSHH  
+  0024 9efe05   [5]             LDHX  5,SP
+  0027 89       [2]             PSHX  
+  0028 8b       [2]             PSHH  
+  0029 cd0000   [6]             JSR   PLMEEnableMC13192Timer1
+  002c a704     [2]             AIS   #4
+  234:                                                                  * Set the 
+  235:                                                                  * timeout in TC1
+  236:                                                                  */
+  237:          u8Status = PLMESetTrxStateRequest(RX_MODE_WTO);
+  002e a680     [2]             LDA   #-128
+  0030          L30:    
+  0030 cc0000   [4]             JMP   PLMESetTrxStateRequest
+  238:      }
+  239:      return u8Status;
+  240:  }
+  241:  
+  242:  /*!
+  243:   * \fn UINT8 MLMERXDisableRequest(void)
+  244:   *
+  245:   * \brief Set the MC13192 receiver OFF
+  246:   *
+  247:   * \return Status
+  248:   */
+  249:  
+  250:  UINT8 MLMERXDisableRequest(void)
+  251:  {
+  252:      (void)PLMEDisableMC13192Timer1();     /* 
+  0000 cd0000   [6]             JSR   PLMEDisableMC13192Timer1
+  253:                                       * In case the timeout is being used, 
+  254:                                       * disable it also 
+  255:                                       */
+  256:      if (PLMESetTrxStateRequest(IDLE_MODE) == SUCCESS) {     /* 
+  0003 4f       [1]             CLRA  
+  0004 cd0000   [6]             JSR   PLMESetTrxStateRequest
+  0007 417702   [4]             CBEQA #119,LC ;abs = 000c
+  257:                                                               * Attempt to 
+  258:                                                               * disable the 
+  259:                                                               * timer 
+  260:                                                               */
+  261:          return SUCCESS;
+  262:      }
+  263:      else {
+  264:          return ERROR;
+  000a a601     [2]             LDA   #1
+  000c          LC:     
+  265:      }
+  266:  }
+  000c 81       [6]             RTS   
+  267:  
+  268:  
+  269:  
+  270:   /*!
+  271:   * \fn UINT8 MLMESetMC13192ClockRate(UINT8 u8Freq)
+  272:   *
+  273:   * \brief Set MC13192 CLKo frequency
+  274:   *
+  275:   * \param u8Freq Frequency value enumeration (0-7)  \n
+  276:   *                                                  \n
+  277:   *  Freq    Output Frequency                        \n
+  278:   *  0       16MHz (Recommended default)             \n
+  279:   *  1       8MHz                                    \n
+  280:   *  2       4MHz                                    \n
+  281:   *  3       2MHz                                    \n
+  282:   *  4       1MHz                                    \n
+  283:   *  5       62.5kHz                                 \n
+  284:   *  6       32.786kHz                               \n
+  285:   *  7       16.393kHz                               \n
+  286:   * 
+  287:   * \return Status
+  288:   */
+  289:  UINT8 MLMESetMC13192ClockRate(UINT8 u8Freq)
+  290:  {
+  291:      UINT8 u8Status;
+  292:      
+  293:      u8Status = PLMESetMC13192ClockRate(u8Freq);
+  0000 cc0000   [4]             JMP   PLMESetMC13192ClockRate
+  294:      return u8Status;
+  295:  }
+  296:  
+  297:  /*!
+  298:   * \fn UINT8 MLMESetMC13192TmrPrescale (UINT8 u8Freq)
+  299:   *
+  300:   * \brief Set MC13192 timer frequency
+  301:   *
+  302:   * \param u8Freq Frequency value enumeration (0-7)  \n
+  303:   *                                                  \n
+  304:   *  Freq    Output Frequency                        \n
+  305:   *  0       16MHz (Recommended default)             \n
+  306:   *  1       8MHz                                    \n
+  307:   *  2       4MHz                                    \n
+  308:   *  3       2MHz                                    \n
+  309:   *  4       1MHz                                    \n
+  310:   *  5       62.5kHz                                 \n
+  311:   *  6       32.786kHz                               \n
+  312:   *  7       16.393kHz                               \n
+  313:   * 
+  314:   * \return Status
+  315:   */
+  316:  UINT8 MLMESetMC13192TmrPrescale (UINT8 u8Freq)
+  317:  {
+  318:      UINT8 u8Status;
+  319:      
+  320:      u8Status = PLMESetMC13192TmrPrescale (u8Freq);
+  0000 cc0000   [4]             JMP   PLMESetMC13192TmrPrescale
+  321:      return u8Status;
+  322:  }
+  323:  
+  324:  /*!
+  325:   * \fn UINT8 MLMEEnergyDetect (void)
+  326:   *
+  327:   * \brief Measure channel energy
+  328:   * 
+  329:   * \return Energy
+  330:   * 
+  331:   * \note                                \n
+  332:   * Actual power returned is: -(power/2) \n
+  333:   * Global calibration required for accuracy (from MLMEMC13192FEGainAdjust).
+  334:  */
+  335:  UINT8 MLMEEnergyDetect (void)
+  336:  {
+  337:      UINT8 u8Power;
+  338:      
+  339:      u8Power = PLMEEnergyDetect();
+  0000 cc0000   [4]             JMP   PLMEEnergyDetect
+  340:      return u8Power;
+  341:  }
+  342:  
+  343:  /*!
+  344:   * \fn  UINT8 MLMEMC13192SoftReset(void)
+  345:   *
+  346:   * \brief Force the MC13192 into a soft reset condition
+  347:   * 
+  348:   * \return Status
+  349:   * 
+  350:  */
+  351:  UINT8 MLMEMC13192SoftReset(void)
+  352:  {
+  353:      UINT8 u8Status;
+  354:  
+  355:      /* Performs a soft reset of MC13192 via writing to register 0*/ 
+  356:      u8Status = PLMEMC13192SoftReset();
+  0000 cc0000   [4]             JMP   PLMEMC13192SoftReset
+  357:      return u8Status;
+  358:  }
+  359:  
+  360:  /*!
+  361:   * \fn UINT8 MLMEMC13192XtalAdjust(UINT8 u8ReqValue)
+  362:   *
+  363:   * \brief Adjust the MC13192s crystal trim value
+  364:   *
+  365:   * \param u8ReqValue Trim Value (0-255)
+  366:   * 
+  367:   * \return Status
+  368:   * 
+  369:  */
+  370:  
+  371:  UINT8 MLMEMC13192XtalAdjust(UINT8 u8ReqValue)
+  372:  {
+  373:      UINT8 u8Status;
+  374:      
+  375:      u8Status = PLMEMC13192XtalAdjust(u8ReqValue);
+  0000 cc0000   [4]             JMP   PLMEMC13192XtalAdjust
+  376:      return u8Status;
+  377:  }
+  378:  
+  379:  
+  380:  /*!
+  381:   * \fn UINT8 MLMELinkQuality (void)
+  382:   *
+  383:   * \brief Report energy from last successful RX packet
+  384:   * 
+  385:   * \return Energy
+  386:   *
+  387:   * \note                                   \n
+  388:   * Actual power returned is: -(power/2)    \n
+  389:   * Global calibration required for accuracy (from MLMEMC13192FEGainAdjust).
+  390:   * 
+  391:  */
+  392:  UINT8 MLMELinkQuality (void)
+  393:  {
+  394:      UINT8 u8Power;
+  395:    
+  396:      u8Power = PLMELinkQuality ();
+  0000 cc0000   [4]             JMP   PLMELinkQuality
+  397:      return u8Power;
+  398:  }
+  399:  
+  400:  /*!
+  401:   * \fn UINT8 MLMEMC13192FEGainAdjust(UINT8 u8GainValue)
+  402:   *
+  403:   * \brief Adjust the MC13192s gain compensator
+  404:   *
+  405:   * \param u8GainValue Gain compensation value (0 to 255. 128 is center point)
+  406:   * 
+  407:   * \return Status
+  408:   */
+  409:  UINT8 MLMEMC13192FEGainAdjust(UINT8 u8GainValue)
+  410:  {
+  411:      UINT8 u8Status;
+  412:      
+  413:      u8Status = PLMEMC13192FEGainAdjust(u8GainValue);
+  0000 cc0000   [4]             JMP   PLMEMC13192FEGainAdjust
+  414:      return u8Status;
+  415:  }
+  416:  
+  417:  
+  418:  /*
+  419:   * MLMEScanRequest : Scan the enabled channels for energy
+  420:   *
+  421:   * Parameters : FLAGS Option (UINT8)
+  422:   *              SCAN_MODE_CCA
+  423:   *              SCAN_MODE_ED
+  424:   *
+  425:   *              (UINT8 *)
+  426:   *              The results of the scan [16 bytes long]
+  427:   *
+  428:   * Return : Status
+  429:   */
+  430:  UINT8 MLMEScanRequest(UINT8 flags, UINT8 *pu8ChannelScan) {
+  0000 87       [2]             PSHA  
+  0001 89       [2]             PSHX  
+  0002 8b       [2]             PSHH  
+  0003 a7f9     [2]             AIS   #-7
+  431:     
+  432:     UINT16 u16ChannelReg1;
+  433:     UINT16 u16ChannelReg2;
+  434:     
+  435:     UINT8 u8ClearestChLevel = 0; /* Default to very busy */
+  0005 95       [2]             TSX   
+  0006 6f03     [5]             CLR   3,X
+  436:     UINT8 u8ClearestCh = 0;
+  0008 6f04     [5]             CLR   4,X
+  437:     UINT8 u8i;
+  438:     UINT16 u16ChannelMask = 0;
+  439:     UINT8 u8Status;
+  440:     
+  441:     /* Turn off the Radio if it is on */
+  442:     (void)MLMERXDisableRequest();
+  000a ad00     [5]             BSR   MLMERXDisableRequest
+  443:     
+  444:     /* Save current channel registers to set it back */
+  445:     u16ChannelReg1 = SPIDrvRead(LO1_IDIV_ADDR);
+  000c a60f     [2]             LDA   #15
+  000e cd0000   [6]             JSR   SPIDrvRead
+  0011 9eff06   [5]             STHX  6,SP
+  446:     u16ChannelReg2 = SPIDrvRead(LO1_NUM_ADDR);
+  0014 a610     [2]             LDA   #16
+  0016 cd0000   [6]             JSR   SPIDrvRead
+  447:     
+  448:     for (u8i=0; u8i < 16; u8i++) {
+  0019 4f       [1]             CLRA  
+  001a          L1A:    
+  449:        u16ChannelMask = (1 << u8i);   
+  450:           u8Status = MLMESetChannelRequest(u8i);
+  001a 87       [2]             PSHA  
+  001b ad00     [5]             BSR   MLMESetChannelRequest
+  451:           if (flags & SCAN_MODE_CCA) {
+  001d 95       [2]             TSX   
+  001e e60a     [3]             LDA   10,X
+  0020 a510     [2]             BIT   #16
+  0022 cd0000   [6]             JSR   _PUSH_CC
+  0025 f6       [3]             LDA   ,X
+  0026 cd0000   [6]             JSR   _POP_CC
+  0029 8a       [3]             PULH  
+  002a 2710     [3]             BEQ   L3C ;abs = 003c
+  452:              pu8ChannelScan[u8i] = PLMECCARequest();
+  002c 87       [2]             PSHA  
+  002d 95       [2]             TSX   
+  002e eb09     [3]             ADD   9,X
+  0030 87       [2]             PSHA  
+  0031 4f       [1]             CLRA  
+  0032 e908     [3]             ADC   8,X
+  0034 87       [2]             PSHA  
+  0035 cd0000   [6]             JSR   PLMECCARequest
+  0038 8a       [3]             PULH  
+  0039 88       [3]             PULX  
+  003a f7       [2]             STA   ,X
+  003b 86       [3]             PULA  
+  003c          L3C:    
+  453:           }
+  454:           
+  455:           if (flags & SCAN_MODE_ED) {
+  003c 87       [2]             PSHA  
+  003d 95       [2]             TSX   
+  003e e60a     [3]             LDA   10,X
+  0040 a520     [2]             BIT   #32
+  0042 cd0000   [6]             JSR   _PUSH_CC
+  0045 f6       [3]             LDA   ,X
+  0046 cd0000   [6]             JSR   _POP_CC
+  0049 8a       [3]             PULH  
+  004a 2710     [3]             BEQ   L5C ;abs = 005c
+  456:              pu8ChannelScan[u8i] = PLMEEnergyDetect();
+  004c 87       [2]             PSHA  
+  004d 95       [2]             TSX   
+  004e eb09     [3]             ADD   9,X
+  0050 87       [2]             PSHA  
+  0051 4f       [1]             CLRA  
+  0052 e908     [3]             ADC   8,X
+  0054 87       [2]             PSHA  
+  0055 cd0000   [6]             JSR   PLMEEnergyDetect
+  0058 8a       [3]             PULH  
+  0059 88       [3]             PULX  
+  005a f7       [2]             STA   ,X
+  005b 86       [3]             PULA  
+  005c          L5C:    
+  457:           }
+  458:        
+  459:        /* Find the clearest Channel (Largest Number)*/       
+  460:        if (pu8ChannelScan[u8i] > u8ClearestChLevel) {
+  005c 87       [2]             PSHA  
+  005d 95       [2]             TSX   
+  005e eb09     [3]             ADD   9,X
+  0060 e701     [3]             STA   1,X
+  0062 4f       [1]             CLRA  
+  0063 e908     [3]             ADC   8,X
+  0065 87       [2]             PSHA  
+  0066 ee01     [3]             LDX   1,X
+  0068 9ee606   [4]             LDA   6,SP
+  006b 8a       [3]             PULH  
+  006c f1       [3]             CMP   ,X
+  006d 86       [3]             PULA  
+  006e 2407     [3]             BCC   L77 ;abs = 0077
+  461:           u8ClearestChLevel = pu8ChannelScan[u8i];
+  0070 fe       [3]             LDX   ,X
+  0071 9eef04   [4]             STX   4,SP
+  462:           u8ClearestCh = u8i;
+  0074 9ee705   [4]             STA   5,SP
+  0077          L77:    
+  0077 4c       [1]             INCA  
+  0078 a110     [2]             CMP   #16
+  007a 259e     [3]             BCS   L1A ;abs = 001a
+  463:        }
+  464:           
+  465:     }
+  466:  
+  467:     /* Restore Channel Value */
+  468:     SPIDrvWrite(LO1_IDIV_ADDR, u16ChannelReg1);
+  007c a60f     [2]             LDA   #15
+  007e 9efe06   [5]             LDHX  6,SP
+  0081 9eff02   [5]             STHX  2,SP
+  0084 cd0000   [6]             JSR   SPIDrvWrite
+  469:     SPIDrvWrite(LO1_IDIV_ADDR, u16ChannelReg1);
+  0087 9eee03   [4]             LDX   3,SP
+  008a 9ee602   [4]             LDA   2,SP
+  008d 87       [2]             PSHA  
+  008e 8a       [3]             PULH  
+  008f a60f     [2]             LDA   #15
+  0091 cd0000   [6]             JSR   SPIDrvWrite
+  470:     
+  471:     return u8ClearestCh;
+  0094 9ee605   [4]             LDA   5,SP
+  472:  }
+  0097 a70a     [2]             AIS   #10
+  0099 81       [6]             RTS   
+  473:  
+  474:  
+  475:  /*!
+  476:   * \fn UINT8 MLMEMC13192PAOutputAdjust(UINT8 u8PaValue)
+  477:   *
+  478:   * \brief Adjust the Output power of the transmitter
+  479:   *
+  480:   * \param u8PaValue Course Valueacket
+  481:   * 
+  482:   * \return Status
+  483:   */
+  484:  UINT8 MLMEMC13192PAOutputAdjust(UINT8 u8PaValue)
+  485:  {
+  486:      UINT8 u8Status;
+  487:      
+  488:      u8Status = PLMEMC13192PAOutputAdjust(u8PaValue);
+  0000 cc0000   [4]             JMP   PLMEMC13192PAOutputAdjust
+  489:      return u8Status;
+  490:  }
+  491:  
+  492:  /*!
+  493:   * \fn UINT8 MLMEGetRficVersion(void)
+  494:   *
+  495:   * \brief Reads the version number of the IC
+  496:   * 
+  497:   * \return The version number of the IC
+  498:   */
+  499:  UINT8 MLMEGetRficVersion(void)
+  500:  {
+  501:      UINT8 u8Version;
+  502:      
+  503:      u8Version = PLMEGetRficVersion();
+  0000 cc0000   [4]             JMP   PLMEGetRficVersion
+  504:      return u8Version;
+  505:  }
+  506:  /*!
+  507:   * \fn void MLMETestMode (tTxPacket *psPacket, UINT8 u8mode)
+  508:   *
+  509:   * \brief Execute a test mode
+  510:   *
+  511:   * \param *psPacket Packet pointer
+  512:   * \param u8mode desired test mode
+  513:   * 
+  514:   */
+  515:  void MLMETestMode (tTxPacket *psPacket, UINT8 u8mode)
+  516:  {
+  0000 a7f9     [2]             AIS   #-7
+  517:      UINT16 u16reg;
+  518:      UINT32 i;
+  519:      switch (u8mode)
+  0002 a105     [2]             CMP   #5
+  0004 2303     [3]             BLS   L9 ;abs = 0009
+  0006 cc01d8   [4]             JMP   L1D8 ;abs = 01d8
+  0009          L9:     
+  0009 a104     [2]             CMP   #4
+  000b 2410     [3]             BCC   L1D ;abs = 001d
+  000d 41011c   [4]             CBEQA #1,L2C ;abs = 002c
+  0010 410221   [4]             CBEQA #2,L34 ;abs = 0034
+  0013 a103     [2]             CMP   #3
+  0015 2603     [3]             BNE   L1A ;abs = 001a
+  0017 cc00c8   [4]             JMP   LC8 ;abs = 00c8
+  001a          L1A:    
+  001a cc01d8   [4]             JMP   L1D8 ;abs = 01d8
+  001d          L1D:    
+  001d 2603     [3]             BNE   L22 ;abs = 0022
+  001f cc00e4   [4]             JMP   LE4 ;abs = 00e4
+  0022          L22:    
+  0022 a105     [2]             CMP   #5
+  0024 2603     [3]             BNE   L29 ;abs = 0029
+  0026 cc0152   [4]             JMP   L152 ;abs = 0152
+  0029          L29:    
+  0029 cc01d8   [4]             JMP   L1D8 ;abs = 01d8
+  002c          L2C:    
+  520:      {
+  521:          /* Continuously transmit a PRBS9 pattern. */
+  522:          case PULSE_TX_PRBS9:            
+  523:              PLMELoadPRBS9 (psPacket);   /* Load the TX RAM */
+  002c cd0000   [6]             JSR   PLMELoadPRBS9
+  524:              (void)PLMESetTrxStateRequest(PULSE_TX_MODE); /* transmit it. Interrupt 
+  002f a643     [2]             LDA   #67
+  525:                                                      * routine will retransmit
+  526:                                                      * after completion 
+  527:                                                      */
+  528:          break;
+  0031 cc01d5   [4]             JMP   L1D5 ;abs = 01d5
+  0034          L34:    
+  529:          /* Sets the device back to original IDLE mode. */
+  530:          case FORCE_IDLE:
+  531:          
+  532:             MC13192DisableInterrupts();  /* Mask off interrupts from MC13192 */
+  0034 cd0000   [6]             JSR   MC13192DisableInterrupts
+  533:             RTXENDeAssert();             /* Force MC13192 to IDLE */
+  0037 cd0000   [6]             JSR   RTXENDeAssert
+  534:             gu8RTxMode = IDLE_MODE;      /* set the SW mode to IDLE */
+  003a 4f       [1]             CLRA  
+  003b c70000   [4]             STA   gu8RTxMode
+  535:             MC13192RestoreInterrupts();
+  003e cd0000   [6]             JSR   MC13192RestoreInterrupts
+  536:             
+  537:             for (i=0; i < 200; i++)
+  0041 5f       [1]             CLRX  
+  0042 8c       [1]             CLRH  
+  0043 9eff06   [5]             STHX  6,SP
+  0046 8c       [1]             CLRH  
+  0047 9eff04   [5]             STHX  4,SP
+  004a          L4A:    
+  004a 95       [2]             TSX   
+  004b af03     [2]             AIX   #3
+  004d cd0000   [6]             JSR   _LINC
+  0050 cd0000   [6]             JSR   _POP32
+  0053 9efe04   [5]             LDHX  4,SP
+  0056 2608     [3]             BNE   L60 ;abs = 0060
+  0058 9efe06   [5]             LDHX  6,SP
+  005b 6500c8   [3]             CPHX  #200
+  005e 25ea     [3]             BCS   L4A ;abs = 004a
+  0060          L60:    
+  538:                  ; /* Empty Loop */
+  539:              (void)PLMESetTrxStateRequest(IDLE_MODE);  /* Set to IDLE */
+  0060 4f       [1]             CLRA  
+  0061 cd0000   [6]             JSR   PLMESetTrxStateRequest
+  540:              u16reg = SPIDrvRead(BER_REG);       /* Turn off BER mode */
+  0064 a630     [2]             LDA   #48
+  0066 cd0000   [6]             JSR   SPIDrvRead
+  0069 9eff02   [5]             STHX  2,SP
+  541:              u16reg = (u16reg & ~(BER_MASK));
+  006c 95       [2]             TSX   
+  006d e601     [3]             LDA   1,X
+  006f a47f     [2]             AND   #127
+  0071 e701     [3]             STA   1,X
+  542:              SPIDrvWrite(BER_REG,u16reg);
+  0073 a630     [2]             LDA   #48
+  0075 9efe02   [5]             LDHX  2,SP
+  0078 cd0000   [6]             JSR   SPIDrvWrite
+  543:              u16reg = SPIDrvRead(PSM_REG);       /* Turn off PSM test mode */
+  007b a631     [2]             LDA   #49
+  007d cd0000   [6]             JSR   SPIDrvRead
+  0080 9eff02   [5]             STHX  2,SP
+  544:              u16reg = (u16reg & ~(PSM_MASK));
+  0083 95       [2]             TSX   
+  0084 e602     [3]             LDA   2,X
+  0086 a4f7     [2]             AND   #-9
+  0088 e702     [3]             STA   2,X
+  545:              SPIDrvWrite(PSM_REG,u16reg);
+  008a a631     [2]             LDA   #49
+  008c 9efe02   [5]             LDHX  2,SP
+  008f cd0000   [6]             JSR   SPIDrvWrite
+  546:              
+  547:              u16reg = SPIDrvRead(PAEN_REG);      /* dis-enable the PA */
+  0092 a608     [2]             LDA   #8
+  0094 cd0000   [6]             JSR   SPIDrvRead
+  0097 9eff02   [5]             STHX  2,SP
+  548:              u16reg = (u16reg & ~PAEN_MASK);
+  009a 95       [2]             TSX   
+  009b e601     [3]             LDA   1,X
+  009d a47f     [2]             AND   #127
+  009f e701     [3]             STA   1,X
+  549:              SPIDrvWrite(PAEN_REG,u16reg);
+  00a1 a608     [2]             LDA   #8
+  00a3 9efe02   [5]             LDHX  2,SP
+  00a6 cd0000   [6]             JSR   SPIDrvWrite
+  550:              
+  551:              (void)PLMESetTrxStateRequest(TX_MODE);    /* Realign TX */
+  00a9 a603     [2]             LDA   #3
+  00ab cd0000   [6]             JSR   PLMESetTrxStateRequest
+  552:              
+  553:              u16reg = SPIDrvRead(PAEN_REG);      /* enable the PA */
+  00ae a608     [2]             LDA   #8
+  00b0 cd0000   [6]             JSR   SPIDrvRead
+  00b3 9eff02   [5]             STHX  2,SP
+  554:              u16reg = (u16reg | PAEN_MASK);
+  00b6 95       [2]             TSX   
+  00b7 e601     [3]             LDA   1,X
+  00b9 aa80     [2]             ORA   #-128
+  00bb e701     [3]             STA   1,X
+  555:              SPIDrvWrite(PAEN_REG,u16reg);
+  00bd a608     [2]             LDA   #8
+  00bf 9efe02   [5]             LDHX  2,SP
+  00c2 cd0000   [6]             JSR   SPIDrvWrite
+  556:              
+  557:          break;
+  00c5 cc01d8   [4]             JMP   L1D8 ;abs = 01d8
+  00c8          LC8:    
+  558:          /* Sets the device into continuous RX mode */
+  559:          case CONTINUOUS_RX:
+  560:              u16reg = SPIDrvRead(BER_REG);       /* Turn on BER mode */
+  00c8 a630     [2]             LDA   #48
+  00ca cd0000   [6]             JSR   SPIDrvRead
+  00cd 9eff02   [5]             STHX  2,SP
+  561:              u16reg = (u16reg | BER_MASK);
+  00d0 95       [2]             TSX   
+  00d1 e601     [3]             LDA   1,X
+  00d3 aa80     [2]             ORA   #-128
+  00d5 e701     [3]             STA   1,X
+  562:              SPIDrvWrite(BER_REG,u16reg);
+  00d7 a630     [2]             LDA   #48
+  00d9 9efe02   [5]             LDHX  2,SP
+  00dc cd0000   [6]             JSR   SPIDrvWrite
+  563:              (void)PLMESetTrxStateRequest(RX_MODE);    /* Turn the receiver on */
+  00df a602     [2]             LDA   #2
+  564:          break;
+  00e1 cc01d5   [4]             JMP   L1D5 ;abs = 01d5
+  00e4          LE4:    
+  565:          /* Sets the device to continuously transmit a 10101010 pattern */
+  566:          case CONTINUOUS_TX_MOD:
+  567:              SPIDrvWrite(TX_PKT,0xAAAA);         /* Load the test pattern */
+  00e4 a602     [2]             LDA   #2
+  00e6 45aaaa   [3]             LDHX  #-21846
+  00e9 cd0000   [6]             JSR   SPIDrvWrite
+  568:              u16reg = SPIDrvRead(PAEN_REG);      /* Disable the PA */
+  00ec a608     [2]             LDA   #8
+  00ee cd0000   [6]             JSR   SPIDrvRead
+  00f1 9eff02   [5]             STHX  2,SP
+  569:              u16reg = (u16reg & ~(PAEN_MASK));
+  00f4 95       [2]             TSX   
+  00f5 e601     [3]             LDA   1,X
+  00f7 a47f     [2]             AND   #127
+  00f9 e701     [3]             STA   1,X
+  570:              SPIDrvWrite(PAEN_REG,u16reg);
+  00fb a608     [2]             LDA   #8
+  00fd 9efe02   [5]             LDHX  2,SP
+  0100 cd0000   [6]             JSR   SPIDrvWrite
+  571:              u16reg = SPIDrvRead(TX_PKT_LEN);    /* Set the length field */
+  0103 a603     [2]             LDA   #3
+  0105 cd0000   [6]             JSR   SPIDrvRead
+  0108 9eff02   [5]             STHX  2,SP
+  572:              u16reg = ((u16reg & ~(TX_PKT_LEN_MASK)) | 0x0004);
+  010b 95       [2]             TSX   
+  010c e602     [3]             LDA   2,X
+  010e a480     [2]             AND   #-128
+  0110 aa04     [2]             ORA   #4
+  573:              SPIDrvWrite(TX_PKT_LEN,u16reg);
+  0112 f7       [2]             STA   ,X
+  0113 fe       [3]             LDX   ,X
+  0114 9ee602   [4]             LDA   2,SP
+  0117 87       [2]             PSHA  
+  0118 8a       [3]             PULH  
+  0119 a603     [2]             LDA   #3
+  011b cd0000   [6]             JSR   SPIDrvWrite
+  574:              (void)PLMESetTrxStateRequest(TX_MODE);    /* Do a transmit to initialize */
+  011e a603     [2]             LDA   #3
+  0120 cd0000   [6]             JSR   PLMESetTrxStateRequest
+  0123          L123:   
+  575:              while (gu8RTxMode != IDLE_MODE)     /* Wait till done */
+  0123 c60000   [4]             LDA   gu8RTxMode
+  0126 26fb     [3]             BNE   L123 ;abs = 0123
+  576:                  ; /* Empty Loop */
+  577:              u16reg = SPIDrvRead(PAEN_REG);      /* Re-enable the PA */
+  0128 a608     [2]             LDA   #8
+  012a cd0000   [6]             JSR   SPIDrvRead
+  012d 9eff02   [5]             STHX  2,SP
+  578:              u16reg = (u16reg | PAEN_MASK);
+  0130 95       [2]             TSX   
+  0131 e601     [3]             LDA   1,X
+  0133 aa80     [2]             ORA   #-128
+  0135 e701     [3]             STA   1,X
+  579:              SPIDrvWrite(PAEN_REG,u16reg);
+  0137 a608     [2]             LDA   #8
+  0139 9efe02   [5]             LDHX  2,SP
+  013c cd0000   [6]             JSR   SPIDrvWrite
+  580:              u16reg = SPIDrvRead(BER_REG);       /* Turn on BER mode */
+  013f a630     [2]             LDA   #48
+  0141 cd0000   [6]             JSR   SPIDrvRead
+  0144 9eff02   [5]             STHX  2,SP
+  581:              u16reg = (u16reg | BER_MASK);
+  0147 95       [2]             TSX   
+  0148 e601     [3]             LDA   1,X
+  014a aa80     [2]             ORA   #-128
+  014c e701     [3]             STA   1,X
+  582:              SPIDrvWrite(BER_REG,u16reg);
+  014e a630     [2]             LDA   #48
+  583:              (void)PLMESetTrxStateRequest(TX_MODE);    /* Turn the transmitter on */
+  584:          break;
+  0150 207b     [3]             BRA   L1CD ;abs = 01cd
+  0152          L152:   
+  585:          /* Sets the device to continuously transmit an unmodulated CW */
+  586:          case CONTINUOUS_TX_NOMOD:
+  587:              u16reg = SPIDrvRead(PAEN_REG);      /* Disable the PA */
+  0152 a608     [2]             LDA   #8
+  0154 cd0000   [6]             JSR   SPIDrvRead
+  0157 9eff02   [5]             STHX  2,SP
+  588:              u16reg = (u16reg & ~(PAEN_MASK));
+  015a 95       [2]             TSX   
+  015b e601     [3]             LDA   1,X
+  015d a47f     [2]             AND   #127
+  015f e701     [3]             STA   1,X
+  589:              SPIDrvWrite(PAEN_REG,u16reg);
+  0161 a608     [2]             LDA   #8
+  0163 9efe02   [5]             LDHX  2,SP
+  0166 cd0000   [6]             JSR   SPIDrvWrite
+  590:              u16reg = SPIDrvRead(TX_PKT_LEN);    /* Set the length field */
+  0169 a603     [2]             LDA   #3
+  016b cd0000   [6]             JSR   SPIDrvRead
+  016e 9eff02   [5]             STHX  2,SP
+  591:              u16reg = ((u16reg & ~(TX_PKT_LEN_MASK)) | 0x0004);
+  0171 95       [2]             TSX   
+  0172 e602     [3]             LDA   2,X
+  0174 a480     [2]             AND   #-128
+  0176 aa04     [2]             ORA   #4
+  592:              SPIDrvWrite(TX_PKT_LEN,u16reg);
+  0178 f7       [2]             STA   ,X
+  0179 fe       [3]             LDX   ,X
+  017a 9ee602   [4]             LDA   2,SP
+  017d 87       [2]             PSHA  
+  017e 8a       [3]             PULH  
+  017f a603     [2]             LDA   #3
+  0181 cd0000   [6]             JSR   SPIDrvWrite
+  593:              (void)PLMESetTrxStateRequest(TX_MODE);    /* Do a transmit to initialize */
+  0184 a603     [2]             LDA   #3
+  0186 cd0000   [6]             JSR   PLMESetTrxStateRequest
+  0189          L189:   
+  594:              while (gu8RTxMode != IDLE_MODE)     /* Wait till done */
+  0189 c60000   [4]             LDA   gu8RTxMode
+  018c 26fb     [3]             BNE   L189 ;abs = 0189
+  595:                  ; /* Empty Loop */
+  596:              u16reg = SPIDrvRead(PAEN_REG);      /* Re-enable the PA */
+  018e a608     [2]             LDA   #8
+  0190 cd0000   [6]             JSR   SPIDrvRead
+  0193 9eff02   [5]             STHX  2,SP
+  597:              u16reg = (u16reg | PAEN_MASK);
+  0196 95       [2]             TSX   
+  0197 e601     [3]             LDA   1,X
+  0199 aa80     [2]             ORA   #-128
+  019b e701     [3]             STA   1,X
+  598:              SPIDrvWrite(PAEN_REG,u16reg);
+  019d a608     [2]             LDA   #8
+  019f 9efe02   [5]             LDHX  2,SP
+  01a2 cd0000   [6]             JSR   SPIDrvWrite
+  599:              u16reg = SPIDrvRead(BER_REG);       /* Turn on BER mode */
+  01a5 a630     [2]             LDA   #48
+  01a7 cd0000   [6]             JSR   SPIDrvRead
+  01aa 9eff02   [5]             STHX  2,SP
+  600:              u16reg = (u16reg | BER_MASK);
+  01ad 95       [2]             TSX   
+  01ae e601     [3]             LDA   1,X
+  01b0 aa80     [2]             ORA   #-128
+  01b2 e701     [3]             STA   1,X
+  601:              SPIDrvWrite(BER_REG,u16reg);
+  01b4 a630     [2]             LDA   #48
+  01b6 9efe02   [5]             LDHX  2,SP
+  01b9 cd0000   [6]             JSR   SPIDrvWrite
+  602:              u16reg = SPIDrvRead(PSM_REG);       /* Turn off PSM */
+  01bc a631     [2]             LDA   #49
+  01be cd0000   [6]             JSR   SPIDrvRead
+  01c1 9eff02   [5]             STHX  2,SP
+  603:              u16reg = (u16reg | PSM_MASK);
+  01c4 95       [2]             TSX   
+  01c5 e602     [3]             LDA   2,X
+  01c7 aa08     [2]             ORA   #8
+  01c9 e702     [3]             STA   2,X
+  604:              SPIDrvWrite(PSM_REG,u16reg);
+  01cb a631     [2]             LDA   #49
+  01cd          L1CD:   
+  01cd 9efe02   [5]             LDHX  2,SP
+  01d0 cd0000   [6]             JSR   SPIDrvWrite
+  605:              (void)PLMESetTrxStateRequest(TX_MODE);    /* Turn the transmitter on */
+  01d3 a603     [2]             LDA   #3
+  01d5          L1D5:   
+  01d5 cd0000   [6]             JSR   PLMESetTrxStateRequest
+  01d8          L1D8:   
+  606:          break;
+  607:      }
+  608:  }
+  01d8 a707     [2]             AIS   #7
+  01da 81       [6]             RTS   

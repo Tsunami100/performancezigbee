@@ -1,0 +1,70 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  #include "drivers.h"
+    2:  #include "MC1321XSRB.h"
+    3:  
+    4:  extern UINT8 gu8RTxMode;
+    5:  
+    6:  void RadioInit(void) {
+    7:      SPIDrvWrite(0x11,0x80FF);   /* Eliminate Unlock Conditions due to L01 */
+  0000 a611     [2]             LDA   #17
+  0002 4580ff   [3]             LDHX  #-32513
+  0005 cd0000   [6]             JSR   SPIDrvWrite
+    8:      SPIDrvWrite(0x1B,0x8000);   /* Disable TC1. */
+  0008 a61b     [2]             LDA   #27
+  000a 458000   [3]             LDHX  #-32768
+  000d cd0000   [6]             JSR   SPIDrvWrite
+    9:      SPIDrvWrite(0x1D,0x8000);   /* Disable TC2. */
+  0010 5f       [1]             CLRX  
+  0011 a680     [2]             LDA   #-128
+  0013 87       [2]             PSHA  
+  0014 8a       [3]             PULH  
+  0015 a61d     [2]             LDA   #29
+  0017 cd0000   [6]             JSR   SPIDrvWrite
+   10:      SPIDrvWrite(0x1F,0x8000);   /* Disable TC3. */
+  001a 5f       [1]             CLRX  
+  001b a680     [2]             LDA   #-128
+  001d 87       [2]             PSHA  
+  001e 8a       [3]             PULH  
+  001f a61f     [2]             LDA   #31
+  0021 cd0000   [6]             JSR   SPIDrvWrite
+   11:      SPIDrvWrite(0x21,0x8000);   /* Disable TC4. */
+  0024 5f       [1]             CLRX  
+  0025 a680     [2]             LDA   #-128
+  0027 87       [2]             PSHA  
+  0028 8a       [3]             PULH  
+  0029 a621     [2]             LDA   #33
+  002b cd0000   [6]             JSR   SPIDrvWrite
+   12:      SPIDrvWrite(0x07,0x4C00);   /* Enable CLKo in Doze */
+  002e a607     [2]             LDA   #7
+  0030 454c00   [3]             LDHX  #19456
+  0033 cd0000   [6]             JSR   SPIDrvWrite
+   13:      SPIDrvWrite(0x0C,0x0381);   /* IRQ pull-up disable. Vdd for RF switch is set*/
+  0036 a60c     [2]             LDA   #12
+  0038 450381   [3]             LDHX  #897
+  003b cd0000   [6]             JSR   SPIDrvWrite
+   14:      SPIDrvWrite(0x04,0xA08D);   /* New cal value */
+  003e a604     [2]             LDA   #4
+  0040 45a08d   [3]             LDHX  #-24435
+  0043 cd0000   [6]             JSR   SPIDrvWrite
+   15:      SPIDrvWrite(0x05,0x8351);   /* Acoma, TC1, Doze, ATTN masks, LO1, CRC */
+  0046 a605     [2]             LDA   #5
+  0048 458351   [3]             LDHX  #-31919
+  004b cd0000   [6]             JSR   SPIDrvWrite
+   16:      SPIDrvWrite(0x06,0x4720);   /* CCA, TX, RX, energy detect */
+  004e a606     [2]             LDA   #6
+  0050 454720   [3]             LDHX  #18208
+  0053 cd0000   [6]             JSR   SPIDrvWrite
+   17:      SPIDrvWrite(0x0B,0xC0FE);   /* IRQ pull-up disable. Vdd for RF switch is set*/
+  0056 a60b     [2]             LDA   #11
+  0058 45c0fe   [3]             LDHX  #-16130
+  005b cd0000   [6]             JSR   SPIDrvWrite
+   18:      (void)SPIDrvRead(0x25);
+  005e a625     [2]             LDA   #37
+  0060 cd0000   [6]             JSR   SPIDrvRead
+   19:      /* Advance the state variable to Idle */
+   20:      gu8RTxMode = IDLE_MODE;
+  0063 4f       [1]             CLRA  
+  0064 c70000   [4]             STA   gu8RTxMode
+   21:  }
+  0067 81       [6]             RTS   

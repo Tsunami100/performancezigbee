@@ -1,0 +1,72 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /*
+    2:   * vectortable.c
+    3:   * This file holds the interrupt vector table
+    4:   
+    5:   * $Author: rgd04c $
+    6:   * $Date: 2006/09/06 05:43:32 $
+    7:   * $Name:  $
+    8:   */
+    9:  #include "pub_def.h"
+   10:  #include "app_config.h"
+   11:  
+   12:  typedef void(*tIsrFunc)(void);
+   13:  
+   14:  
+   15:  extern interrupt void IRQIsr(void);
+   16:  
+   17:  //extern interrupt void KBD_ISR();
+   18:  
+   19:  //*****************************
+   20:  //Put your ISR routines here.
+   21:  //extern interrupt void yourAppISR(void);
+   22:  extern interrupt void Vscirx();
+   23:  extern interrupt void IRQTimer1();
+   24:  extern interrupt void KBIisr();
+   25:  //Put the Function Name of your interrupt handler into this constant array.
+   26:  //at the ISR location that you want.
+   27:  
+   28:  interrupt void UnimplementedISR(void)
+   29:  {
+  0000 8b       [2]             PSHH  
+  0001          L1:     
+   30:    for(;;);
+  0001 20fe     [3]             BRA   L1 ;abs = 0001
+   31:  }
+   32:  
+   33:  // Added redirected ISR vectors when BootLoader is enabled.
+   34:  // The application cannot have a reset vector (resides in BootLoader).
+   35:  #if (EMBEDDED_BOOTLOADER == TRUE)
+   36:      // Redirected ISR vectors
+   37:      const tIsrFunc _vect[] @0xEFCC = {  /* Interrupt table */
+   38:  #else
+   39:      const tIsrFunc _vect[] @0xFFCC = {  /* Interrupt table */
+   40:  #endif
+   41:          UnimplementedISR,       /* vector 25: RT */
+   42:          UnimplementedISR,       /* vector 24: IIC */
+   43:          UnimplementedISR,       /* vector 23: ATD */
+   44:          KBIisr,  		/* vector 22: KBI */
+   45:          UnimplementedISR,  		/* vector 21: SCI2TX */
+   46:          Vscirx,       			/* vector 20: SCI2RX */
+   47:          UnimplementedISR,       /* vector 19: SCI2ER */
+   48:          UnimplementedISR,		/* vector 18: SCI1TX */
+   49:          Vscirx,	    			/* vector 17: SCI1RX */
+   50:          UnimplementedISR,       /* vector 16: SCI1ER */
+   51:          UnimplementedISR,       /* vector 15: SPI */
+   52:          UnimplementedISR,  		/* vector 14: TPM2OF */
+   53:          UnimplementedISR,       /* vector 13: TPM2C4 */
+   54:          UnimplementedISR,       /* vector 12: TPM2C3 */
+   55:          UnimplementedISR,       /* vector 11: TPM2C2 */
+   56:          UnimplementedISR,       /* vector 10: TPM2C1 */
+   57:          UnimplementedISR,       /* vector 09: TPM2C0 */
+   58:          IRQTimer1,               /* vector 08: TPM1OF */
+   59:          UnimplementedISR,       /* vector 07: TPM1C2 */
+   60:          UnimplementedISR,       /* vector 06: TPM1C1 */
+   61:          UnimplementedISR,      	/* vector 05: TPM1C0 */
+   62:          UnimplementedISR,       /* vector 04: ICG */
+   63:          UnimplementedISR,       /* vector 03: Low Voltage Detect */
+   64:          IRQIsr,                /* vector 02: IRQ pin */
+   65:          UnimplementedISR        /* vector 01: SWI */
+   66:          /*_Startup, by default in library*/ /* Reset vector */
+   67:     };

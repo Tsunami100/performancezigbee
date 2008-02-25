@@ -1,0 +1,1774 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /*
+    2:   * Copyright (c) 2004, Freescale Semiconductor
+    3:   * Freescale Confidential Proprietary
+    4:   *
+    5:   */
+    6:  /*!
+    7:   * \file simple_phy.c
+    8:   *
+    9:   * \brief  This is the SMAC C code for the PHY layer  
+   10:   *
+   11:   * \author a19259 
+   12:   *
+   13:   * \version 4.1a
+   14:   *
+   15:   * \date - 29/07/2005 03:30:28
+   16:   *
+   17:   * \b Description: This is the SMAC C source physical layer file for the HC(S)08
+   18:   *                 MCU and MC13192 transceiver.
+   19:   *                 The SMAC phy is the second lowest layer of C code.
+   20:   * 
+   21:   * \b Project name: SMAC (Simple Media Access Controller)
+   22:   *
+   23:   * \b Department : Freescale Radio Products Division
+   24:   *
+   25:   * \b History: 
+   26:   * - 16/11/2005 Doc. update to Doxygen compliant by Laura Delgado r12370c
+   27:   * 
+   28:   */
+   29:  
+   30:  #include "MC13192_regs.h"
+   31:  #include "MC13192_hw_config.h"
+   32:  #include "pub_def.h"
+   33:  #include "drivers.h"
+   34:  #include "simple_phy.h"
+   35:  #include "simple_mac.h"
+   36:  #include "mcu_hw_config.h"
+   37:  #include "app_config.h"
+   38:  
+   39:  /* Globals */
+   40:  extern tRxPacket *psDrvRxPacket; //!< Where the packet received will be stored 
+   41:  extern UINT8 gu8RTxMode;         //!< Global mode mirror. MC13192 Status.  
+   42:  tPhyOptions gsPhyOptions;
+   43:  
+   44:  extern UINT16 u16StatusContent;
+   45:  
+   46:  
+   47:  /* Version string to put in NVM. Note! size limits */
+   48:  /* Normally it shoud be enough to change the version numbers. */
+   49:  #define PHY_Version     "4.2 "
+   50:  #define PHY_Label       "SMAC"
+   51:  #define PHY_VerComplete "PHY " PHY_Label " Ver " PHY_Version " Build: " __DATE__ " " __TIME__
+   52:  #define PHY_VerSize     sizeof(PHY_VerComplete)
+   53:  
+   54:  
+   55:  #if defined (HCS08G) | defined (HCS08R)	| defined (_HCS12)
+   56:    #include <hidef.h>
+   57:  #pragma MESSAGE DISABLE C3303  /* 
+   58:                                  * Warning C3303: Implicit concatenation of 
+   59:                                  * strings 
+   60:                                  */
+   61:  #pragma MESSAGE DISABLE C4200  /* 
+   62:                                  * Warning C4200: Other segment than in previous 
+   63:                                  * declaration
+   64:                                  */
+   65:  #pragma CONST_SEG BOOTLOADER_PHY_NV_DATA0
+   66:  #endif
+   67:  
+   68:  // DO NOT CHANGE OR REMOVE
+   69:  
+   70:  // This string will be located in the NV RAM0 section.
+   71:  // Note!! Check that item is location in the sequence as specified. 
+   72:  const unsigned char SPHY_Version[PHY_VerSize] = PHY_VerComplete;
+   73:  
+   74:  #if defined (HCS08G) | defined (HCS08R) | defined (_HCS12)
+   75:  #pragma CONST_SEG DEFAULT
+   76:  #endif
+   77:  
+   78:  
+   79:  
+   80:  
+   81:  /*
+   82:   * PLMEPhyInit : Sets the default values for Phy
+   83:   *
+   84:   * Parameters : Uses the gsPhyOptions
+   85:   *
+   86:   * Return : Status
+   87:   */
+   88:   
+   89:   UINT8 PLMEPhyReset(void) {
+   90:   
+   91:     /* Sets the default Options */
+   92:     gsPhyOptions.Bits.u1PromiscuousMode = SMAC_PROMISCUOUS_MODE;
+  0000 450001   [3]             LDHX  @gsPhyOptions:1
+  0003 f6       [3]             LDA   ,X
+  0004 a4fe     [2]             AND   #-2
+  0006 f7       [2]             STA   ,X
+   93:     gsPhyOptions.Byte.u16ScanChannels = 0xFFFF; /* Default to all channels */
+  0007 45ffff   [3]             LDHX  #-1
+  000a 960002   [5]             STHX  gsPhyOptions:2
+   94:     
+   95:     return SUCCESS;  
+  000d a677     [2]             LDA   #119
+   96:   }
+  000f 81       [6]             RTS   
+   97:  /*!
+   98:   * \fn UINT8 PDDataRequest(tTxPacket *psPacket) 
+   99:   *
+  100:   * \brief Transmit data packet
+  101:   *
+  102:   * \param *psPacket packet pointer
+  103:   *
+  104:   * \return Status
+  105:   */
+  106:  UINT8 PDDataRequest(tTxPacket *psPacket)
+  107:  {
+  108:      if (gu8RTxMode == IDLE_MODE)
+  0000 c60000   [4]             LDA   gu8RTxMode
+  0003 2614     [3]             BNE   L19 ;abs = 0019
+  109:      { 
+  110:          #if (SMAC_FEATURE_SECURITY == TRUE)
+  111:            SECSecure(psPacket->pu8Data, psPacket->u8DataLength);
+  112:          #endif /* SMAC_FEATURE_SECURITY */
+  113:          
+  114:          RAMDrvWriteTx(psPacket);            /* Load the data into packet RAM */
+  0005 cd0000   [6]             JSR   RAMDrvWriteTx
+  115:          (void)PLMESetTrxStateRequest(TX_MODE);    /* transmit it */
+  0008 a603     [2]             LDA   #3
+  000a cd0000   [6]             JSR   PLMESetTrxStateRequest
+  116:  
+  117:          /* Wait for the state to return to idle. (finish transmitting) */
+  118:          while (gu8RTxMode != IDLE_MODE)
+  000d 2001     [3]             BRA   L10 ;abs = 0010
+  000f          LF:     
+  119:          {
+  120:              MCU_LOW_POWER_WHILE();
+  000f 8f       [2]             WAIT  
+  0010          L10:    
+  0010 c60000   [4]             LDA   gu8RTxMode
+  0013 26fa     [3]             BNE   LF ;abs = 000f
+  121:          }
+  122:          return SUCCESS;
+  0015 a677     [2]             LDA   #119
+  0017 2002     [3]             BRA   L1B ;abs = 001b
+  0019          L19:    
+  123:      }
+  124:      else
+  125:      {
+  126:          return RX_ON;
+  0019 a601     [2]             LDA   #1
+  001b          L1B:    
+  127:      }
+  128:  }
+  001b 81       [6]             RTS   
+  129:  
+  130:  /*!
+  131:   * \fn void PDDataIndication()
+  132:   *
+  133:   * \brief Receive data packet indication.
+  134:   *
+  135:   */
+  136:  void PDDataIndication()
+  137:  {
+  138:      /* Read the Data only if it is a good packet. */
+  139:      if (psDrvRxPacket->u8Status == SUCCESS)
+  0000 320000   [5]             LDHX  psDrvRxPacket
+  0003 e604     [3]             LDA   4,X
+  0005 a177     [2]             CMP   #119
+  0007 2603     [3]             BNE   LC ;abs = 000c
+  140:      {
+  141:          (void)RAMDrvReadRx(psDrvRxPacket);        /* 
+  0009 cd0000   [6]             JSR   RAMDrvReadRx
+  000c          LC:     
+  142:                                               * Read data from MC13192, 
+  143:                                               * check status 
+  144:                                               */
+  145:      }
+  146:      EnableInterrupts;       /* Allow system interrupts within the IRQ handler */
+  000c 9a       [1]             CLI   
+  147:      
+  148:      #if (SMAC_FEATURE_SECURITY == TRUE)
+  149:        SECSecure(psDrvRxPacket->pu8Data, psDrvRxPacket->u8DataLength);
+  150:      #endif /* SMAC_FEATURE_SECURITY */
+  151:      
+  152:      #if (SMAC_FEATURE_OTAP == TRUE)
+  153:        if (gu8OTAPStatusAPI == OTAP_ACTIVE){
+  154:          OTAPDataIndication(psDrvRxPacket);
+  155:        } else {
+  156:          MCPSDataIndication(psDrvRxPacket);
+  157:        }
+  158:      #else
+  159:        MCPSDataIndication(psDrvRxPacket);
+  000d 320000   [5]             LDHX  psDrvRxPacket
+  0010 cc0000   [4]             JMP   MCPSDataIndication
+  160:      #endif /* SMAC_FEATURE_OTAP */
+  161:  
+  162:  }
+  163:  
+  164:  /*!
+  165:   * \fn UINT8 PLMEHibernateRequest(void) 
+  166:   *
+  167:   * \brief Hibernate the MC13192 (very low current, no CLKO).
+  168:   *
+  169:   * \return Status
+  170:   */
+  171:   UINT8 PLMEHibernateRequest(void)
+  172:  {
+  0000 a7fe     [2]             AIS   #-2
+  173:      UINT16 u16CurrentValue;
+  174:      
+  175:      gu8RTxMode = HIBERNATE_MODE;
+  0002 a681     [2]             LDA   #-127
+  0004 c70000   [4]             STA   gu8RTxMode
+  176:      u16CurrentValue = SPIDrvRead(MODE2_ADDR);       /* 
+  0007 a607     [2]             LDA   #7
+  0009 cd0000   [6]             JSR   SPIDrvRead
+  000c 9eff01   [5]             STHX  1,SP
+  177:                                                       * Read MC13192 Hiberate 
+  178:                                                       * register. 
+  179:                                                       */
+  180:      u16CurrentValue &= 0xFFFC;
+  000f 95       [2]             TSX   
+  0010 e601     [3]             LDA   1,X
+  0012 a4fc     [2]             AND   #-4
+  0014 e701     [3]             STA   1,X
+  181:      u16CurrentValue |= 0x0002;                      /* Hiberate enable */
+  0016 aa02     [2]             ORA   #2
+  0018 e701     [3]             STA   1,X
+  182:      SPIDrvWrite(MODE2_ADDR, u16CurrentValue);       /* 
+  001a a607     [2]             LDA   #7
+  001c 9efe01   [5]             LDHX  1,SP
+  001f cd0000   [6]             JSR   SPIDrvWrite
+  183:                                                       * Write back to MC13192 to 
+  184:                                                       * enable hibernate mode. 
+  185:                                                       */
+  186:      return SUCCESS;         /* Call back to MAC layer indicating success. */
+  0022 a677     [2]             LDA   #119
+  187:  }
+  0024 a702     [2]             AIS   #2
+  0026 81       [6]             RTS   
+  188:  
+  189:  /*!
+  190:   * \fn UINT8 PLMEDozeRequest(UINT32 u32Timeout) 
+  191:   *
+  192:   * \brief Doze the MC13192 (Low current, CLKO <= 1MHz).
+  193:   *
+  194:   * \param u32Timeout - timeout
+  195:   *
+  196:   * \return Status
+  197:   */
+  198:  
+  199:  UINT8 PLMEDozeRequest(UINT32 u32Timeout)
+  200:  {
+  0000 a7fa     [2]             AIS   #-6
+  201:      UINT16 u16CurrentValue;
+  202:      UINT32 u32CurrentTime;
+  203:      
+  204:      gu8RTxMode = DOZE_MODE;
+  0002 a682     [2]             LDA   #-126
+  0004 c70000   [4]             STA   gu8RTxMode
+  205:      u16CurrentValue = SPIDrvRead(MODE2_ADDR);       /* 
+  0007 a607     [2]             LDA   #7
+  0009 cd0000   [6]             JSR   SPIDrvRead
+  206:                                                       * Read MC13192 Doze 
+  207:                                                       * register. 
+  208:                                                       */
+  209:      if (u32Timeout == 0)        /* ACOMA mode, with clkout */
+  000c 95       [2]             TSX   
+  000d e60b     [3]             LDA   11,X
+  000f ea0a     [3]             ORA   10,X
+  0011 ea09     [3]             ORA   9,X
+  0013 ea08     [3]             ORA   8,X
+  0015 2647     [3]             BNE   L5E ;abs = 005e
+  210:      {
+  211:          u16CurrentValue = SPIDrvRead(IRQ_MASK);
+  0017 a605     [2]             LDA   #5
+  0019 cd0000   [6]             JSR   SPIDrvRead
+  001c 9eff01   [5]             STHX  1,SP
+  212:          u16CurrentValue &= 0xFE0D;   /* Change the IRQ_Mask to set Acoma en,*/
+  001f 95       [2]             TSX   
+  0020 e601     [3]             LDA   1,X
+  0022 a40d     [2]             AND   #13
+  0024 e701     [3]             STA   1,X
+  0026 f6       [3]             LDA   ,X
+  0027 a4fe     [2]             AND   #-2
+  0029 f7       [2]             STA   ,X
+  213:          u16CurrentValue |= 0x0100;   /* doze irq disabled and tmr2 disabled*/
+  002a aa01     [2]             ORA   #1
+  002c f7       [2]             STA   ,X
+  214:          SPIDrvWrite(IRQ_MASK, u16CurrentValue);      
+  002d a605     [2]             LDA   #5
+  002f 9efe01   [5]             LDHX  1,SP
+  0032 cd0000   [6]             JSR   SPIDrvWrite
+  215:          
+  216:          u16CurrentValue = SPIDrvRead(MODE2_ADDR);       /* 
+  0035 a607     [2]             LDA   #7
+  0037 cd0000   [6]             JSR   SPIDrvRead
+  003a 9eff01   [5]             STHX  1,SP
+  217:                                                           * Read MC13192 Doze 
+  218:                                                           * register. 
+  219:                                                           */
+  220:          u16CurrentValue &= 0xFDFC;
+  003d 95       [2]             TSX   
+  003e e601     [3]             LDA   1,X
+  0040 a4fc     [2]             AND   #-4
+  0042 87       [2]             PSHA  
+  0043 f6       [3]             LDA   ,X
+  0044 a4fd     [2]             AND   #-3
+  221:          u16CurrentValue |= 0x0201;                      /* Doze (acoma) & CLKOUT enable */
+  0046 87       [2]             PSHA  
+  0047 95       [2]             TSX   
+  0048 e601     [3]             LDA   1,X
+  004a aa01     [2]             ORA   #1
+  004c e703     [3]             STA   3,X
+  004e 86       [3]             PULA  
+  004f aa02     [2]             ORA   #2
+  0051 e702     [3]             STA   2,X
+  222:          SPIDrvWrite(MODE2_ADDR, u16CurrentValue);       /* 
+  0053 a607     [2]             LDA   #7
+  0055 9efe02   [5]             LDHX  2,SP
+  0058 cd0000   [6]             JSR   SPIDrvWrite
+  223:                                                           * Write back to MC13192 to 
+  224:                                                           * enable hibernate mode. 
+  225:                                                           */
+  226:      } else						 /* DOZE mode with timeout, no clkout */
+  005b 8a       [3]             PULH  
+  005c 2071     [3]             BRA   LCF ;abs = 00cf
+  005e          L5E:    
+  227:      {
+  228:          u16CurrentValue = SPIDrvRead(IRQ_MASK);
+  005e a605     [2]             LDA   #5
+  0060 cd0000   [6]             JSR   SPIDrvRead
+  0063 9eff01   [5]             STHX  1,SP
+  229:          u16CurrentValue &= 0xFE0D;   /* Change the IRQ_Mask to set Acoma dis,*/
+  0066 95       [2]             TSX   
+  0067 e601     [3]             LDA   1,X
+  0069 a40d     [2]             AND   #13
+  006b e701     [3]             STA   1,X
+  006d f6       [3]             LDA   ,X
+  006e a4fe     [2]             AND   #-2
+  0070 f7       [2]             STA   ,X
+  230:          u16CurrentValue |= 0x0012;   /* doze enabled and tmr2 enabled*/
+  0071 e601     [3]             LDA   1,X
+  0073 aa12     [2]             ORA   #18
+  0075 e701     [3]             STA   1,X
+  231:          SPIDrvWrite(IRQ_MASK, u16CurrentValue);      
+  0077 a605     [2]             LDA   #5
+  0079 9efe01   [5]             LDHX  1,SP
+  007c cd0000   [6]             JSR   SPIDrvWrite
+  232:          
+  233:          u32CurrentTime = PLMEGetTimeRequest();
+  007f 95       [2]             TSX   
+  0080 af02     [2]             AIX   #2
+  0082 cd0000   [6]             JSR   PLMEGetTimeRequest
+  234:          u32Timeout += u32CurrentTime;
+  0085 95       [2]             TSX   
+  0086 e605     [3]             LDA   5,X
+  0088 eb0b     [3]             ADD   11,X
+  008a e70b     [3]             STA   11,X
+  008c e60a     [3]             LDA   10,X
+  008e e904     [3]             ADC   4,X
+  0090 e70a     [3]             STA   10,X
+  0092 e609     [3]             LDA   9,X
+  0094 e903     [3]             ADC   3,X
+  0096 e709     [3]             STA   9,X
+  0098 e602     [3]             LDA   2,X
+  009a e908     [3]             ADC   8,X
+  009c e708     [3]             STA   8,X
+  235:          SPIDrvWrite( T2_HI_ADDR, ((UINT16)(u32Timeout>>16)&0x00FF) ); 
+  009e a61d     [2]             LDA   #29
+  00a0 ee09     [3]             LDX   9,X
+  00a2 8c       [1]             CLRH  
+  00a3 cd0000   [6]             JSR   SPIDrvWrite
+  236:          SPIDrvWrite( T2_LO_ADDR, ((UINT16)u32Timeout)&0xFFFF );  /* Enable the Timer 2 
+  00a6 a61e     [2]             LDA   #30
+  00a8 9efe0b   [5]             LDHX  11,SP
+  00ab cd0000   [6]             JSR   SPIDrvWrite
+  237:                                                           * and save the timeout value
+  238:                                                           */
+  239:          u16CurrentValue = SPIDrvRead(MODE2_ADDR);
+  00ae a607     [2]             LDA   #7
+  00b0 cd0000   [6]             JSR   SPIDrvRead
+  00b3 9eff01   [5]             STHX  1,SP
+  240:          u16CurrentValue &= 0xFDFC;						/* Disable CLKOinDozeand */
+  00b6 95       [2]             TSX   
+  00b7 e601     [3]             LDA   1,X
+  00b9 a4fc     [2]             AND   #-4
+  00bb e701     [3]             STA   1,X
+  00bd f6       [3]             LDA   ,X
+  00be a4fd     [2]             AND   #-3
+  00c0 f7       [2]             STA   ,X
+  241:          u16CurrentValue |= 0x0001;                      /* enter in Doze mode */
+  00c1 e601     [3]             LDA   1,X
+  00c3 aa01     [2]             ORA   #1
+  00c5 e701     [3]             STA   1,X
+  242:          SPIDrvWrite(MODE2_ADDR, u16CurrentValue);      
+  00c7 a607     [2]             LDA   #7
+  00c9 9efe01   [5]             LDHX  1,SP
+  00cc cd0000   [6]             JSR   SPIDrvWrite
+  00cf          LCF:    
+  243:      }
+  244:      return SUCCESS;         /* Call back to MAC layer indicating success. */
+  00cf a677     [2]             LDA   #119
+  245:  }
+  00d1 a706     [2]             AIS   #6
+  00d3 81       [6]             RTS   
+  246:  
+  247:   /*!
+  248:   * \fn UINT8 PLMEWakeRequest(void) 
+  249:   *
+  250:   * \brief Wake the MC13192 from Hibernate or Doze. 
+  251:   *
+  252:   * \return Status
+  253:   */
+  254:  UINT8 PLMEWakeRequest(void)
+  255:  {
+  0000 a7fe     [2]             AIS   #-2
+  256:      UINT16 u16CurrentValue;
+  257:      
+  258:      MC13192Wake();                              /* Wake up the device */
+  0002 cd0000   [6]             JSR   MC13192Wake
+  259:      while (gu8RTxMode != IDLE_MODE_ATTN)
+  0005 2001     [3]             BRA   L8 ;abs = 0008
+  0007          L7:     
+  260:      {
+  261:          MCU_LOW_POWER_WHILE();                    /* Wait until ATTN */
+  0007 8f       [2]             WAIT  
+  0008          L8:     
+  0008 c60000   [4]             LDA   gu8RTxMode
+  000b a184     [2]             CMP   #-124
+  000d 26f8     [3]             BNE   L7 ;abs = 0007
+  262:      }
+  263:      u16CurrentValue = SPIDrvRead(MODE2_ADDR);       /* 
+  000f a607     [2]             LDA   #7
+  0011 cd0000   [6]             JSR   SPIDrvRead
+  0014 9eff01   [5]             STHX  1,SP
+  264:                                                       * Read MC13192 
+  265:                                                       * Hibernate/Doze register. 
+  266:                                                       */
+  267:      u16CurrentValue &= 0xFFFC;                  /* Hiberate and Doze disable */
+  0017 95       [2]             TSX   
+  0018 e601     [3]             LDA   1,X
+  001a a4fc     [2]             AND   #-4
+  001c e701     [3]             STA   1,X
+  268:      SPIDrvWrite(MODE2_ADDR, u16CurrentValue);       /* 
+  001e a607     [2]             LDA   #7
+  0020 9efe01   [5]             LDHX  1,SP
+  0023 cd0000   [6]             JSR   SPIDrvWrite
+  269:                                                       * Write back to MC13192 to 
+  270:                                                       * disable hibernate and doze 
+  271:                                                       * mode. 
+  272:                                                       */
+  273:      SPIDrvWrite(T2_HI_ADDR, 0x0000);                /* Disable Timer2
+  0026 a61d     [2]             LDA   #29
+  0028 5f       [1]             CLRX  
+  0029 8c       [1]             CLRH  
+  002a cd0000   [6]             JSR   SPIDrvWrite
+  274:                                                       * To avoid a T2 int because
+  275:                                                       * of doze w/timeout
+  276:                                                       */
+  277:      gu8RTxMode = IDLE_MODE;
+  002d 4f       [1]             CLRA  
+  002e c70000   [4]             STA   gu8RTxMode
+  278:      return SUCCESS;
+  0031 a677     [2]             LDA   #119
+  279:  }
+  0033 a702     [2]             AIS   #2
+  0035 81       [6]             RTS   
+  280:  
+  281:   /*!
+  282:   * \fn UINT8 PLMESetChannelRequest(UINT8 u8Channel)
+  283:   *
+  284:   * \brief Set the MC13192 operating channel.
+  285:   *
+  286:   * \param u8Channel Channel number
+  287:   *
+  288:   * \return Status
+  289:   */
+  290:  UINT8 PLMESetChannelRequest(UINT8 u8Channel)
+  291:  {
+  292:      switch (u8Channel)
+  0000 a10f     [2]             CMP   #15
+  0002 2218     [3]             BHI   L1C ;abs = 001c
+  0004 a108     [2]             CMP   #8
+  0006 2453     [3]             BCC   L5B ;abs = 005b
+  0008 a104     [2]             CMP   #4
+  000a 2431     [3]             BCC   L3D ;abs = 003d
+  000c a102     [2]             CMP   #2
+  000e 2421     [3]             BCC   L31 ;abs = 0031
+  0010 4d       [1]             TSTA  
+  0011 2603     [3]             BNE   L16 ;abs = 0016
+  0013 cc009b   [4]             JMP   L9B ;abs = 009b
+  0016          L16:    
+  0016 4a       [1]             DECA  
+  0017 2603     [3]             BNE   L1C ;abs = 001c
+  0019 cc00ab   [4]             JMP   LAB ;abs = 00ab
+  001c          L1C:    
+  293:      {
+  294:      case 0x00:
+  295:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F95);
+  296:          SPIDrvWrite(LO1_NUM_ADDR,0x5000);
+  297:      break;
+  298:      case 0x01:
+  299:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F95);
+  300:          SPIDrvWrite(LO1_NUM_ADDR,0xA000); 
+  301:      break;
+  302:      case 0x02:
+  303:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F95);
+  304:          SPIDrvWrite(LO1_NUM_ADDR,0xF000); 
+  305:      break;
+  306:      case 0x03:
+  307:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F96);
+  308:          SPIDrvWrite(LO1_NUM_ADDR,0x4000); 
+  309:      break;
+  310:      case 0x04:
+  311:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F96);
+  312:          SPIDrvWrite(LO1_NUM_ADDR,0x9000); 
+  313:      break;
+  314:      case 0x05:
+  315:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F96);
+  316:          SPIDrvWrite(LO1_NUM_ADDR,0xE000); 
+  317:      break;
+  318:      case 0x06:
+  319:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F97);
+  320:          SPIDrvWrite(LO1_NUM_ADDR,0x3000); 
+  321:      break;
+  322:      case 0x07:
+  323:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F97);
+  324:          SPIDrvWrite(LO1_NUM_ADDR,0x8000); 
+  325:      break;
+  326:      case 0x08:
+  327:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F97);
+  328:          SPIDrvWrite(LO1_NUM_ADDR,0xD000); 
+  329:      break;
+  330:      case 0x09:
+  331:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F98);
+  332:          SPIDrvWrite(LO1_NUM_ADDR,0x2000); 
+  333:      break;
+  334:      case 0x0A:
+  335:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F98);
+  336:          SPIDrvWrite(LO1_NUM_ADDR,0x7000); 
+  337:      break;
+  338:      case 0x0B:
+  339:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F98);
+  340:          SPIDrvWrite(LO1_NUM_ADDR,0xC000); 
+  341:      break;
+  342:      case 0x0C:
+  343:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F99);
+  344:          SPIDrvWrite(LO1_NUM_ADDR,0x1000); 
+  345:      break;
+  346:      case 0x0D:
+  347:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F99);
+  348:          SPIDrvWrite(LO1_NUM_ADDR,0x6000); 
+  349:      break;
+  350:      case 0x0E:
+  351:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F99);
+  352:          SPIDrvWrite(LO1_NUM_ADDR,0xB000); 
+  353:      break;
+  354:      case 0x0F:
+  355:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F9A);
+  356:          SPIDrvWrite(LO1_NUM_ADDR,0x0000); 
+  357:      break;
+  358:      default:
+  359:          SPIDrvWrite(LO1_IDIV_ADDR,0x0F97);
+  001c a60f     [2]             LDA   #15
+  001e 450f97   [3]             LDHX  #3991
+  0021 cd0000   [6]             JSR   SPIDrvWrite
+  360:          SPIDrvWrite(LO1_NUM_ADDR,0xD000); 
+  0024 a610     [2]             LDA   #16
+  0026 45d000   [3]             LDHX  #-12288
+  0029 cd0000   [6]             JSR   SPIDrvWrite
+  361:          return ERROR;
+  002c a601     [2]             LDA   #1
+  002e cc0194   [4]             JMP   L194 ;abs = 0194
+  0031          L31:    
+  0031 2603     [3]             BNE   L36 ;abs = 0036
+  0033 cc00bb   [4]             JMP   LBB ;abs = 00bb
+  0036          L36:    
+  0036 a103     [2]             CMP   #3
+  0038 26e2     [3]             BNE   L1C ;abs = 001c
+  003a cc00cb   [4]             JMP   LCB ;abs = 00cb
+  003d          L3D:    
+  003d a106     [2]             CMP   #6
+  003f 240e     [3]             BCC   L4F ;abs = 004f
+  0041 a104     [2]             CMP   #4
+  0043 2603     [3]             BNE   L48 ;abs = 0048
+  0045 cc00db   [4]             JMP   LDB ;abs = 00db
+  0048          L48:    
+  0048 a105     [2]             CMP   #5
+  004a 26d0     [3]             BNE   L1C ;abs = 001c
+  004c cc00eb   [4]             JMP   LEB ;abs = 00eb
+  004f          L4F:    
+  004f 2603     [3]             BNE   L54 ;abs = 0054
+  0051 cc00fb   [4]             JMP   LFB ;abs = 00fb
+  0054          L54:    
+  0054 a107     [2]             CMP   #7
+  0056 26c4     [3]             BNE   L1C ;abs = 001c
+  0058 cc010b   [4]             JMP   L10B ;abs = 010b
+  005b          L5B:    
+  005b a10c     [2]             CMP   #12
+  005d 241e     [3]             BCC   L7D ;abs = 007d
+  005f a10a     [2]             CMP   #10
+  0061 240e     [3]             BCC   L71 ;abs = 0071
+  0063 a108     [2]             CMP   #8
+  0065 2603     [3]             BNE   L6A ;abs = 006a
+  0067 cc011a   [4]             JMP   L11A ;abs = 011a
+  006a          L6A:    
+  006a a109     [2]             CMP   #9
+  006c 26ae     [3]             BNE   L1C ;abs = 001c
+  006e cc0129   [4]             JMP   L129 ;abs = 0129
+  0071          L71:    
+  0071 2603     [3]             BNE   L76 ;abs = 0076
+  0073 cc0138   [4]             JMP   L138 ;abs = 0138
+  0076          L76:    
+  0076 a10b     [2]             CMP   #11
+  0078 26a2     [3]             BNE   L1C ;abs = 001c
+  007a cc0147   [4]             JMP   L147 ;abs = 0147
+  007d          L7D:    
+  007d a10e     [2]             CMP   #14
+  007f 240e     [3]             BCC   L8F ;abs = 008f
+  0081 a10c     [2]             CMP   #12
+  0083 2603     [3]             BNE   L88 ;abs = 0088
+  0085 cc0156   [4]             JMP   L156 ;abs = 0156
+  0088          L88:    
+  0088 a10d     [2]             CMP   #13
+  008a 2690     [3]             BNE   L1C ;abs = 001c
+  008c cc0165   [4]             JMP   L165 ;abs = 0165
+  008f          L8F:    
+  008f 2603     [3]             BNE   L94 ;abs = 0094
+  0091 cc0174   [4]             JMP   L174 ;abs = 0174
+  0094          L94:    
+  0094 a10f     [2]             CMP   #15
+  0096 2684     [3]             BNE   L1C ;abs = 001c
+  0098 cc0183   [4]             JMP   L183 ;abs = 0183
+  009b          L9B:    
+  009b a60f     [2]             LDA   #15
+  009d 450f95   [3]             LDHX  #3989
+  00a0 cd0000   [6]             JSR   SPIDrvWrite
+  00a3 a610     [2]             LDA   #16
+  00a5 455000   [3]             LDHX  #20480
+  00a8 cc018f   [4]             JMP   L18F ;abs = 018f
+  00ab          LAB:    
+  00ab a60f     [2]             LDA   #15
+  00ad 450f95   [3]             LDHX  #3989
+  00b0 cd0000   [6]             JSR   SPIDrvWrite
+  00b3 a610     [2]             LDA   #16
+  00b5 45a000   [3]             LDHX  #-24576
+  00b8 cc018f   [4]             JMP   L18F ;abs = 018f
+  00bb          LBB:    
+  00bb a60f     [2]             LDA   #15
+  00bd 450f95   [3]             LDHX  #3989
+  00c0 cd0000   [6]             JSR   SPIDrvWrite
+  00c3 a610     [2]             LDA   #16
+  00c5 45f000   [3]             LDHX  #-4096
+  00c8 cc018f   [4]             JMP   L18F ;abs = 018f
+  00cb          LCB:    
+  00cb a60f     [2]             LDA   #15
+  00cd 450f96   [3]             LDHX  #3990
+  00d0 cd0000   [6]             JSR   SPIDrvWrite
+  00d3 a610     [2]             LDA   #16
+  00d5 454000   [3]             LDHX  #16384
+  00d8 cc018f   [4]             JMP   L18F ;abs = 018f
+  00db          LDB:    
+  00db a60f     [2]             LDA   #15
+  00dd 450f96   [3]             LDHX  #3990
+  00e0 cd0000   [6]             JSR   SPIDrvWrite
+  00e3 a610     [2]             LDA   #16
+  00e5 459000   [3]             LDHX  #-28672
+  00e8 cc018f   [4]             JMP   L18F ;abs = 018f
+  00eb          LEB:    
+  00eb a60f     [2]             LDA   #15
+  00ed 450f96   [3]             LDHX  #3990
+  00f0 cd0000   [6]             JSR   SPIDrvWrite
+  00f3 a610     [2]             LDA   #16
+  00f5 45e000   [3]             LDHX  #-8192
+  00f8 cc018f   [4]             JMP   L18F ;abs = 018f
+  00fb          LFB:    
+  00fb a60f     [2]             LDA   #15
+  00fd 450f97   [3]             LDHX  #3991
+  0100 cd0000   [6]             JSR   SPIDrvWrite
+  0103 a610     [2]             LDA   #16
+  0105 453000   [3]             LDHX  #12288
+  0108 cc018f   [4]             JMP   L18F ;abs = 018f
+  010b          L10B:   
+  010b a60f     [2]             LDA   #15
+  010d 450f97   [3]             LDHX  #3991
+  0110 cd0000   [6]             JSR   SPIDrvWrite
+  0113 a610     [2]             LDA   #16
+  0115 458000   [3]             LDHX  #-32768
+  0118 2075     [3]             BRA   L18F ;abs = 018f
+  011a          L11A:   
+  011a a60f     [2]             LDA   #15
+  011c 450f97   [3]             LDHX  #3991
+  011f cd0000   [6]             JSR   SPIDrvWrite
+  0122 a610     [2]             LDA   #16
+  0124 45d000   [3]             LDHX  #-12288
+  0127 2066     [3]             BRA   L18F ;abs = 018f
+  0129          L129:   
+  0129 a60f     [2]             LDA   #15
+  012b 450f98   [3]             LDHX  #3992
+  012e cd0000   [6]             JSR   SPIDrvWrite
+  0131 a610     [2]             LDA   #16
+  0133 452000   [3]             LDHX  #8192
+  0136 2057     [3]             BRA   L18F ;abs = 018f
+  0138          L138:   
+  0138 a60f     [2]             LDA   #15
+  013a 450f98   [3]             LDHX  #3992
+  013d cd0000   [6]             JSR   SPIDrvWrite
+  0140 a610     [2]             LDA   #16
+  0142 457000   [3]             LDHX  #28672
+  0145 2048     [3]             BRA   L18F ;abs = 018f
+  0147          L147:   
+  0147 a60f     [2]             LDA   #15
+  0149 450f98   [3]             LDHX  #3992
+  014c cd0000   [6]             JSR   SPIDrvWrite
+  014f a610     [2]             LDA   #16
+  0151 45c000   [3]             LDHX  #-16384
+  0154 2039     [3]             BRA   L18F ;abs = 018f
+  0156          L156:   
+  0156 a60f     [2]             LDA   #15
+  0158 450f99   [3]             LDHX  #3993
+  015b cd0000   [6]             JSR   SPIDrvWrite
+  015e a610     [2]             LDA   #16
+  0160 451000   [3]             LDHX  #4096
+  0163 202a     [3]             BRA   L18F ;abs = 018f
+  0165          L165:   
+  0165 a60f     [2]             LDA   #15
+  0167 450f99   [3]             LDHX  #3993
+  016a cd0000   [6]             JSR   SPIDrvWrite
+  016d a610     [2]             LDA   #16
+  016f 456000   [3]             LDHX  #24576
+  0172 201b     [3]             BRA   L18F ;abs = 018f
+  0174          L174:   
+  0174 a60f     [2]             LDA   #15
+  0176 450f99   [3]             LDHX  #3993
+  0179 cd0000   [6]             JSR   SPIDrvWrite
+  017c a610     [2]             LDA   #16
+  017e 45b000   [3]             LDHX  #-20480
+  0181 200c     [3]             BRA   L18F ;abs = 018f
+  0183          L183:   
+  0183 a60f     [2]             LDA   #15
+  0185 450f9a   [3]             LDHX  #3994
+  0188 cd0000   [6]             JSR   SPIDrvWrite
+  018b a610     [2]             LDA   #16
+  018d 5f       [1]             CLRX  
+  018e 8c       [1]             CLRH  
+  018f          L18F:   
+  018f cd0000   [6]             JSR   SPIDrvWrite
+  362:      }
+  363:      return SUCCESS;
+  0192 a677     [2]             LDA   #119
+  0194          L194:   
+  364:  }
+  0194 81       [6]             RTS   
+  365:  
+  366:  /*!
+  367:   * \fn UINT8 PLMESetTrxStateRequest(UINT8 u8ReqMode) 
+  368:   *
+  369:   * \brief Set the MC13192 transceive operation.
+  370:   *
+  371:   * \param u8ReqMode Operational mode
+  372:   *
+  373:   * \return Status  
+  374:   */
+  375:  UINT8 PLMESetTrxStateRequest(UINT8 u8ReqMode)
+  376:  {
+  0000 87       [2]             PSHA  
+  0001 a7fe     [2]             AIS   #-2
+  377:      UINT16 u16Reg;
+  378:      
+  379:      RTXENDeAssert(); 
+  0003 cd0000   [6]             JSR   RTXENDeAssert
+  380:      u16Reg = SPIDrvRead(MODE_ADDR);
+  0006 a606     [2]             LDA   #6
+  0008 cd0000   [6]             JSR   SPIDrvRead
+  000b 9eff01   [5]             STHX  1,SP
+  381:      u16Reg &= 0xFFF8;                           /* Clear mode. */
+  000e 95       [2]             TSX   
+  000f e601     [3]             LDA   1,X
+  0011 a4f8     [2]             AND   #-8
+  0013 e701     [3]             STA   1,X
+  382:      switch (u8ReqMode)
+  0015 e602     [3]             LDA   2,X
+  0017 a180     [2]             CMP   #-128
+  0019 220d     [3]             BHI   L28 ;abs = 0028
+  001b a143     [2]             CMP   #67
+  001d 240d     [3]             BCC   L2C ;abs = 002c
+  001f 4d       [1]             TSTA  
+  0020 2712     [3]             BEQ   L34 ;abs = 0034
+  0022 41021c   [4]             CBEQA #2,L41 ;abs = 0041
+  0025 41032f   [4]             CBEQA #3,L57 ;abs = 0057
+  0028          L28:    
+  383:      {
+  384:          //u16Reg |= IDLE_MODE;
+  385:          case IDLE_MODE:                         /* Write Idle */
+  386:          #if defined (LNA)
+  387:              MC13192_LNA_CTRL = LNA_OFF;
+  388:          #endif
+  389:          #if defined (PA)
+  390:              MC13192_PA_CTRL = PA_OFF;
+  391:          #endif
+  392:          gu8RTxMode = IDLE_MODE;
+  393:          SPIDrvWrite(MODE_ADDR, u16Reg);
+  394:          break;
+  395:  
+  396:          case RX_MODE:                           /* Write RX */
+  397:          #if defined (LNA)
+  398:              MC13192_LNA_CTRL = LNA_ON;
+  399:          #endif
+  400:          #if defined (PA)
+  401:              MC13192_PA_CTRL = PA_OFF;
+  402:          #endif
+  403:          #if defined (ANTENNA_SWITCH)
+  404:              MC13192_ANT_CTRL2 = ANT_CTRL_ON;    /* Turn on the RX antenna */
+  405:              MC13192_ANT_CTRL = ANT_CTRL_OFF;    /* Turn off the TX antenna */
+  406:          #endif
+  407:          gu8RTxMode = RX_MODE;
+  408:          u16Reg |= RX_MODE;
+  409:          SPIDrvWrite(MODE_ADDR, u16Reg);
+  410:          RTXENAssert(); 
+  411:          break;
+  412:          
+  413:          case RX_MODE_WTO:           /* Write RX, but set gu8RTxMode to timeout */
+  414:          #if defined (LNA)
+  415:              MC13192_LNA_CTRL = LNA_ON;
+  416:          #endif
+  417:          #if defined (PA)
+  418:              MC13192_PA_CTRL = PA_OFF;
+  419:          #endif
+  420:          #if defined (ANTENNA_SWITCH)
+  421:              MC13192_ANT_CTRL2 = ANT_CTRL_ON;    /* Turn on the RX antenna */
+  422:              MC13192_ANT_CTRL = ANT_CTRL_OFF;    /* Turn off the TX antenna */
+  423:          #endif
+  424:          gu8RTxMode = RX_MODE_WTO;
+  425:          u16Reg |= RX_MODE;
+  426:          SPIDrvWrite(MODE_ADDR, u16Reg);
+  427:          RTXENAssert();
+  428:          break;
+  429:          
+  430:          case TX_MODE:               /* Write Tx. Note: force LO lock not used */
+  431:          #if defined (PA)
+  432:              MC13192_PA_CTRL = PA_ON;
+  433:          #endif
+  434:          #if defined (LNA)
+  435:              MC13192_LNA_CTRL = LNA_OFF;
+  436:          #endif
+  437:          #if defined (ANTENNA_SWITCH)
+  438:              MC13192_ANT_CTRL2 = ANT_CTRL_OFF;   /* Turn off the RX antenna */
+  439:              MC13192_ANT_CTRL = ANT_CTRL_ON;     /* Turn on the TX antenna */
+  440:          #endif
+  441:          u16Reg |= TX_MODE;
+  442:          gu8RTxMode = TX_MODE;
+  443:          SPIDrvWrite(MODE_ADDR, u16Reg);
+  444:          RTXENAssert();
+  445:          break;
+  446:          
+  447:          case PULSE_TX_MODE: /* Write Tx. Note: force LO lock not used */
+  448:  
+  449:  		  #if defined (PA)
+  450:    	         MC13192_PA_CTRL = PA_ON;
+  451:  		  #endif
+  452:  		
+  453:  		  #if defined (LNA)
+  454:  		      MC13192_LNA_CTRL = LNA_OFF;
+  455:  		  #endif
+  456:  		
+  457:  		  #if defined (ANTENNA_SWITCH)
+  458:  				MC13192_ANT_CTRL2 = ANT_CTRL_OFF;	/* Turn off the RX antenna */
+  459:  				MC13192_ANT_CTRL = ANT_CTRL_ON;	/* Turn on the TX antenna */
+  460:  		  #endif
+  461:  						
+  462:  		   u16Reg |= TX_MODE;
+  463:  			gu8RTxMode = PULSE_TX_MODE;
+  464:  			SPIDrvWrite(MODE_ADDR, u16Reg);
+  465:  			RTXENAssert();
+  466:  			break;
+  467:  
+  468:          default:
+  469:          return ERROR;    
+  0028 a601     [2]             LDA   #1
+  002a 2050     [3]             BRA   L7C ;abs = 007c
+  002c          L2C:    
+  002c 2736     [3]             BEQ   L64 ;abs = 0064
+  002e a180     [2]             CMP   #-128
+  0030 26f6     [3]             BNE   L28 ;abs = 0028
+  0032 2018     [3]             BRA   L4C ;abs = 004c
+  0034          L34:    
+  0034 c70000   [4]             STA   gu8RTxMode
+  0037 a606     [2]             LDA   #6
+  0039 9efe01   [5]             LDHX  1,SP
+  003c cd0000   [6]             JSR   SPIDrvWrite
+  003f 2039     [3]             BRA   L7A ;abs = 007a
+  0041          L41:    
+  0041 c70000   [4]             STA   gu8RTxMode
+  0044 e601     [3]             LDA   1,X
+  0046 aa02     [2]             ORA   #2
+  0048 e701     [3]             STA   1,X
+  004a 2023     [3]             BRA   L6F ;abs = 006f
+  004c          L4C:    
+  004c c70000   [4]             STA   gu8RTxMode
+  004f e601     [3]             LDA   1,X
+  0051 aa02     [2]             ORA   #2
+  0053 e701     [3]             STA   1,X
+  0055 2018     [3]             BRA   L6F ;abs = 006f
+  0057          L57:    
+  0057 e601     [3]             LDA   1,X
+  0059 aa03     [2]             ORA   #3
+  005b e701     [3]             STA   1,X
+  005d a603     [2]             LDA   #3
+  005f c70000   [4]             STA   gu8RTxMode
+  0062 200b     [3]             BRA   L6F ;abs = 006f
+  0064          L64:    
+  0064 e601     [3]             LDA   1,X
+  0066 aa03     [2]             ORA   #3
+  0068 e701     [3]             STA   1,X
+  006a a643     [2]             LDA   #67
+  006c c70000   [4]             STA   gu8RTxMode
+  006f          L6F:    
+  006f a606     [2]             LDA   #6
+  0071 9efe01   [5]             LDHX  1,SP
+  0074 cd0000   [6]             JSR   SPIDrvWrite
+  0077 cd0000   [6]             JSR   RTXENAssert
+  007a          L7A:    
+  470:      }
+  471:      return SUCCESS;
+  007a a677     [2]             LDA   #119
+  007c          L7C:    
+  472:  }
+  007c a703     [2]             AIS   #3
+  007e 81       [6]             RTS   
+  473:  
+  474:  /*!
+  475:   * \fn UINT8 PLMEEnergyDetect (void) 
+  476:   *
+  477:   * \brief Measure channel energy.
+  478:   *
+  479:   * \return Energy
+  480:   * \note Actual power returned is: -(power/2)   \n
+  481:   * Global calibration required for accuracy. 
+  482:   */
+  483:  UINT8 PLMEEnergyDetect (void)
+  484:  {
+  0000 a7fe     [2]             AIS   #-2
+  485:      UINT16 u16Reg;
+  486:      UINT8 u8Power;
+  487:      
+  488:      gu8RTxMode = CCA_MODE;                /* Write energy detect mode */
+  0002 a601     [2]             LDA   #1
+  0004 c70000   [4]             STA   gu8RTxMode
+  489:      u16Reg = SPIDrvRead(MODE_ADDR);
+  0007 a606     [2]             LDA   #6
+  0009 cd0000   [6]             JSR   SPIDrvRead
+  000c 9eff01   [5]             STHX  1,SP
+  490:      
+  491:      u16Reg &= 0xFFC8; /* Mask off the CCA_type mode 5:4, xcvr_seq 2:0 */    
+  000f 95       [2]             TSX   
+  0010 e601     [3]             LDA   1,X
+  0012 a4c8     [2]             AND   #-56
+  0014 e701     [3]             STA   1,X
+  492:      u16Reg |= (CCA_MODE | SCAN_MODE_ED); /* Set the CCA mode and turn on CCA */
+  0016 aa21     [2]             ORA   #33
+  0018 e701     [3]             STA   1,X
+  493:      SPIDrvWrite(MODE_ADDR, u16Reg);
+  001a a606     [2]             LDA   #6
+  001c 9efe01   [5]             LDHX  1,SP
+  001f cd0000   [6]             JSR   SPIDrvWrite
+  494:      RTXENAssert();
+  0022 cd0000   [6]             JSR   RTXENAssert
+  495:      while (gu8RTxMode != IDLE_MODE)       /* Wait for energy detect to complete */
+  0025 2001     [3]             BRA   L28 ;abs = 0028
+  0027          L27:    
+  496:          {
+  497:          MCU_LOW_POWER_WHILE();
+  0027 8f       [2]             WAIT  
+  0028          L28:    
+  0028 c60000   [4]             LDA   gu8RTxMode
+  002b 26fa     [3]             BNE   L27 ;abs = 0027
+  498:          }
+  499:      u16Reg = (SPIDrvRead(CCA_RESULT_ADDR) & 0xFF00);
+  002d a62d     [2]             LDA   #45
+  002f cd0000   [6]             JSR   SPIDrvRead
+  0032 5f       [1]             CLRX  
+  0033 9eff01   [5]             STHX  1,SP
+  500:      u8Power = (UINT8)(u16Reg >> 8);
+  0036 95       [2]             TSX   
+  0037 f6       [3]             LDA   ,X
+  501:      return u8Power;
+  502:  }
+  0038 a702     [2]             AIS   #2
+  003a 81       [6]             RTS   
+  503:  
+  504:  UINT8 PLMECCARequest (void)
+  505:  /* Note: Actual power returned is: -(power/2) */
+  506:  /* Global calibration required for accuracy. */
+  507:  {
+  0000 a7fe     [2]             AIS   #-2
+  508:      UINT16 u16Reg;
+  509:      //UINT8 u8Power;
+  510:      
+  511:      gu8RTxMode = CCA_MODE;                /* Write energy detect mode */
+  0002 a601     [2]             LDA   #1
+  0004 c70000   [4]             STA   gu8RTxMode
+  512:      u16Reg = SPIDrvRead(MODE_ADDR);
+  0007 a606     [2]             LDA   #6
+  0009 cd0000   [6]             JSR   SPIDrvRead
+  000c 9eff01   [5]             STHX  1,SP
+  513:      
+  514:      u16Reg &= 0xFFC8; /* Mask off the CCA_type mode 5:4, xcvr_seq 2:0 */    
+  000f 95       [2]             TSX   
+  0010 e601     [3]             LDA   1,X
+  0012 a4c8     [2]             AND   #-56
+  0014 e701     [3]             STA   1,X
+  515:      u16Reg |= (CCA_MODE | SCAN_MODE_CCA); /* Set the CCA mode and turn on CCA */
+  0016 aa11     [2]             ORA   #17
+  0018 e701     [3]             STA   1,X
+  516:      SPIDrvWrite(MODE_ADDR, u16Reg);
+  001a a606     [2]             LDA   #6
+  001c 9efe01   [5]             LDHX  1,SP
+  001f cd0000   [6]             JSR   SPIDrvWrite
+  517:      RTXENAssert();
+  0022 cd0000   [6]             JSR   RTXENAssert
+  518:      while (gu8RTxMode != IDLE_MODE)       /* Wait for energy detect to complete */
+  0025 2001     [3]             BRA   L28 ;abs = 0028
+  0027          L27:    
+  519:          {
+  520:          MCU_LOW_POWER_WHILE();
+  0027 8f       [2]             WAIT  
+  0028          L28:    
+  0028 c60000   [4]             LDA   gu8RTxMode
+  002b 26fa     [3]             BNE   L27 ;abs = 0027
+  521:          }
+  522:      
+  523:      if ((u16StatusContent & CCA_BIT_MASK) == 0) {
+  002d c60001   [4]             LDA   u16StatusContent:1
+  0030 a502     [2]             BIT   #2
+  0032 2603     [3]             BNE   L37 ;abs = 0037
+  524:        return 0; //Clear  
+  0034 4f       [1]             CLRA  
+  0035 2002     [3]             BRA   L39 ;abs = 0039
+  0037          L37:    
+  525:      } else {
+  526:        return 1; //BUSY
+  0037 a601     [2]             LDA   #1
+  0039          L39:    
+  527:      }
+  528:  }
+  0039 a702     [2]             AIS   #2
+  003b 81       [6]             RTS   
+  529:  
+  530:  /*!
+  531:   * \fn UINT8 PLMELinkQuality (void)
+  532:   *
+  533:   * \brief Report energy from last successful RX packet.
+  534:   *
+  535:   * \return Energy
+  536:   *
+  537:   * \note Actual power returned is: -(power/2) \n
+  538:   *     Global calibration required for accuracy. 
+  539:   */
+  540:  UINT8 PLMELinkQuality (void)
+  541:  {
+  0000 a7fe     [2]             AIS   #-2
+  542:      UINT16 u16Reg;
+  543:      UINT8 u8Power;
+  544:      
+  545:      u16Reg = SPIDrvRead(CCA_RESULT_ADDR);
+  0002 a62d     [2]             LDA   #45
+  0004 cd0000   [6]             JSR   SPIDrvRead
+  0007 9eff01   [5]             STHX  1,SP
+  546:      u8Power = (UINT8)((u16Reg & 0xFF00) >> 8);
+  000a 95       [2]             TSX   
+  000b f6       [3]             LDA   ,X
+  547:      return u8Power;
+  548:  }
+  000c a702     [2]             AIS   #2
+  000e 81       [6]             RTS   
+  549:  
+  550:  /*!
+  551:   * \fn UINT32 PLMEGetTimeRequest(void) 
+  552:   *
+  553:   * \brief Get MC13192 timer value. 
+  554:   *
+  555:   * \return Timer value
+  556:   */
+  557:  
+  558:  UINT32 PLMEGetTimeRequest(void)
+  559:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7f4     [2]             AIS   #-12
+  560:      UINT32 u32UpperWord, u32LowerWord;
+  561:      UINT32 u32CurrentTime;
+  562:      
+  563:      DisableInterrupts;
+  0004 9b       [1]             SEI   
+  564:      u32UpperWord = SPIDrvRead(TIMESTAMP_HI_ADDR);
+  0005 a626     [2]             LDA   #38
+  0007 cd0000   [6]             JSR   SPIDrvRead
+  000a 9eff0b   [5]             STHX  11,SP
+  000d 8c       [1]             CLRH  
+  000e 5f       [1]             CLRX  
+  000f 9eff09   [5]             STHX  9,SP
+  565:      u32LowerWord = SPIDrvRead(TIMESTAMP_LO_ADDR);
+  0012 a627     [2]             LDA   #39
+  0014 cd0000   [6]             JSR   SPIDrvRead
+  0017 9eff03   [5]             STHX  3,SP
+  001a 8c       [1]             CLRH  
+  001b 5f       [1]             CLRX  
+  001c 9eff01   [5]             STHX  1,SP
+  566:      u32UpperWord &= TIMESTAMP_HI_MASK;              /* Clears TS_HELD bit. */
+  001f 9ee60c   [4]             LDA   12,SP
+  0022 97       [1]             TAX   
+  0023 9eff0b   [5]             STHX  11,SP
+  0026 5f       [1]             CLRX  
+  0027 9eff09   [5]             STHX  9,SP
+  567:      u32CurrentTime = (UINT32) (u32UpperWord << 16) | u32LowerWord;
+  002a 95       [2]             TSX   
+  002b af08     [2]             AIX   #8
+  002d a610     [2]             LDA   #16
+  002f cd0000   [6]             JSR   _LLSL
+  0032 95       [2]             TSX   
+  0033 e603     [3]             LDA   3,X
+  0035 ea07     [3]             ORA   7,X
+  0037 87       [2]             PSHA  
+  0038 e602     [3]             LDA   2,X
+  003a ea06     [3]             ORA   6,X
+  003c 87       [2]             PSHA  
+  003d 8a       [3]             PULH  
+  003e 88       [3]             PULX  
+  003f 9eff0b   [5]             STHX  11,SP
+  0042 95       [2]             TSX   
+  0043 f6       [3]             LDA   ,X
+  0044 87       [2]             PSHA  
+  0045 ee01     [3]             LDX   1,X
+  0047 8a       [3]             PULH  
+  0048 9eff09   [5]             STHX  9,SP
+  004b a704     [2]             AIS   #4
+  568:      EnableInterrupts;
+  004d 9a       [1]             CLI   
+  569:      return u32CurrentTime;
+  004e 9efe0d   [5]             LDHX  13,SP
+  0051 9ee605   [4]             LDA   5,SP
+  0054 f7       [2]             STA   ,X
+  0055 9ee606   [4]             LDA   6,SP
+  0058 e701     [3]             STA   1,X
+  005a 9ee607   [4]             LDA   7,SP
+  005d e702     [3]             STA   2,X
+  005f 9ee608   [4]             LDA   8,SP
+  0062 e703     [3]             STA   3,X
+  570:  }
+  0064 a70e     [2]             AIS   #14
+  0066 81       [6]             RTS   
+  571:  
+  572:  /*!
+  573:   * \fn UINT8 PLMESetMC13192ClockRate(UINT8 u8Freq)
+  574:   *
+  575:   * \brief Set MC13192 CLKo frequency.
+  576:   *
+  577:   * \param u8Freq Frequency value
+  578:   *
+  579:   * \return Status
+  580:   */
+  581:  
+  582:  UINT8 PLMESetMC13192ClockRate(UINT8 u8Freq)
+  583:  {
+  0000 a7fe     [2]             AIS   #-2
+  584:      volatile UINT16 u16CurrentValue;
+  585:      
+  586:      u16CurrentValue = SPIDrvRead(CLKS_ADDR); /* Read register and re-write */
+  0002 87       [2]             PSHA  
+  0003 a60a     [2]             LDA   #10
+  0005 cd0000   [6]             JSR   SPIDrvRead
+  0008 9eff02   [5]             STHX  2,SP
+  587:      u16CurrentValue &= 0xFFF8;
+  000b 9efe02   [5]             LDHX  2,SP
+  000e 9f       [1]             TXA   
+  000f a4f8     [2]             AND   #-8
+  0011 97       [1]             TAX   
+  0012 9eff02   [5]             STHX  2,SP
+  588:      u16CurrentValue |= u8Freq;
+  0015 9efe02   [5]             LDHX  2,SP
+  0018 9f       [1]             TXA   
+  0019 9eea01   [4]             ORA   1,SP
+  001c 97       [1]             TAX   
+  001d 9eff02   [5]             STHX  2,SP
+  589:      SPIDrvWrite(CLKS_ADDR, u16CurrentValue);
+  0020 a60a     [2]             LDA   #10
+  0022 9efe02   [5]             LDHX  2,SP
+  0025 cd0000   [6]             JSR   SPIDrvWrite
+  590:      return SUCCESS;
+  0028 a677     [2]             LDA   #119
+  002a 8a       [3]             PULH  
+  591:  }
+  002b a702     [2]             AIS   #2
+  002d 81       [6]             RTS   
+  592:  
+  593:  /*!
+  594:   * \fn UINT8 PLMESetMC13192TmrPrescale (UINT8 freq) 
+  595:   *
+  596:   * \brief Set MC13192 timer frequency.
+  597:   *
+  598:   * \param freq Frequency value
+  599:   *
+  600:   * \return Status
+  601:   */
+  602:  UINT8 PLMESetMC13192TmrPrescale (UINT8 freq) 
+  603:  {
+  0000 a7fe     [2]             AIS   #-2
+  604:      volatile UINT16 current_value;
+  605:      
+  606:      current_value = SPIDrvRead(PRESCALE_ADDR);
+  0002 87       [2]             PSHA  
+  0003 a609     [2]             LDA   #9
+  0005 cd0000   [6]             JSR   SPIDrvRead
+  0008 9eff02   [5]             STHX  2,SP
+  607:      current_value &= 0xFFF8;
+  000b 9efe02   [5]             LDHX  2,SP
+  000e 9f       [1]             TXA   
+  000f a4f8     [2]             AND   #-8
+  0011 97       [1]             TAX   
+  0012 9eff02   [5]             STHX  2,SP
+  608:      current_value |= freq;
+  0015 9efe02   [5]             LDHX  2,SP
+  0018 9f       [1]             TXA   
+  0019 9eea01   [4]             ORA   1,SP
+  001c 97       [1]             TAX   
+  001d 9eff02   [5]             STHX  2,SP
+  609:      SPIDrvWrite(PRESCALE_ADDR, current_value);
+  0020 a609     [2]             LDA   #9
+  0022 9efe02   [5]             LDHX  2,SP
+  0025 cd0000   [6]             JSR   SPIDrvWrite
+  610:      return SUCCESS;
+  0028 a677     [2]             LDA   #119
+  002a 8a       [3]             PULH  
+  611:  }
+  002b a702     [2]             AIS   #2
+  002d 81       [6]             RTS   
+  612:  
+  613:  /*!
+  614:   * \fn void PLMESetTimeRequest(UINT32 u32RequestedTime)
+  615:   *
+  616:   * \brief Set MC13192 timer value (i.e. initialize)
+  617:   *
+  618:   * \param u32RequestedTime Timer Value
+  619:   *
+  620:   */
+  621:  void PLMESetTimeRequest(UINT32 u32RequestedTime)
+  622:  {
+  0000 a7fc     [2]             AIS   #-4
+  623:      UINT16 u16UpperWord, u16LowerWord;
+  624:      UINT16 u16Mode2RegVal;
+  625:      
+  626:      /* Split 32 bit input into 2 16 bit values */
+  627:      u16UpperWord = (UINT16) (u32RequestedTime >> 16) & 0x000000FF;
+  628:      u16LowerWord = (UINT16) u32RequestedTime & 0x0000FFFF;
+  0002 9efe09   [5]             LDHX  9,SP
+  0005 9eff03   [5]             STHX  3,SP
+  629:      /* Program Time1 comparator with the desired value */    
+  630:      SPIDrvWrite(T1_HI_ADDR, u16UpperWord);
+  0008 a61b     [2]             LDA   #27
+  000a 9eee08   [4]             LDX   8,SP
+  000d 8c       [1]             CLRH  
+  000e cd0000   [6]             JSR   SPIDrvWrite
+  631:      SPIDrvWrite(T1_LO_ADDR, u16LowerWord);
+  0011 a61c     [2]             LDA   #28
+  0013 9efe03   [5]             LDHX  3,SP
+  0016 cd0000   [6]             JSR   SPIDrvWrite
+  632:      /* Get current state of the MODE2 MC13192 register */
+  633:      u16Mode2RegVal = SPIDrvRead(MODE2_ADDR);
+  0019 a607     [2]             LDA   #7
+  001b cd0000   [6]             JSR   SPIDrvRead
+  001e 9eff01   [5]             STHX  1,SP
+  634:      /* Set the Tmr_load bit */
+  635:      u16Mode2RegVal |= 0x8000;
+  0021 95       [2]             TSX   
+  0022 f6       [3]             LDA   ,X
+  0023 aa80     [2]             ORA   #-128
+  0025 f7       [2]             STA   ,X
+  636:      /* Now write the value back to MC13192 register MODE2 */
+  637:      SPIDrvWrite(MODE2_ADDR, u16Mode2RegVal);
+  0026 a607     [2]             LDA   #7
+  0028 9efe01   [5]             LDHX  1,SP
+  002b cd0000   [6]             JSR   SPIDrvWrite
+  638:      /* Clear the tmr_load bit */
+  639:      u16Mode2RegVal &= 0x7FFF;
+  002e 95       [2]             TSX   
+  002f f6       [3]             LDA   ,X
+  0030 a47f     [2]             AND   #127
+  0032 f7       [2]             STA   ,X
+  640:      /* Clr the tmr_load bit to prepare for next set_time_request. */
+  641:      SPIDrvWrite(MODE2_ADDR, u16Mode2RegVal);    
+  0033 a607     [2]             LDA   #7
+  0035 9efe01   [5]             LDHX  1,SP
+  0038 cd0000   [6]             JSR   SPIDrvWrite
+  642:      return;
+  643:  }
+  003b a704     [2]             AIS   #4
+  003d 81       [6]             RTS   
+  644:  
+  645:  /*!
+  646:   * \fn UINT8 PLMEEnableMC13192Timer1(UINT32 u32CounterValue)
+  647:   *
+  648:   * \brief Set MC13192 timer compare value.
+  649:   *
+  650:   * \param u32CounterValue 
+  651:   *
+  652:   * \return Status
+  653:   */
+  654:  UINT8 PLMEEnableMC13192Timer1(UINT32 u32CounterValue)
+  655:  {
+  656:      /* Load the timeout value into T1 with Timer disabled. */
+  657:      SPIDrvWrite(T1_HI_ADDR, (UINT16) ((u32CounterValue >> 16) & 0x000000FF)|\
+  0000 a61b     [2]             LDA   #27
+  0002 4580ff   [3]             LDHX  #-32513
+  0005 cd0000   [6]             JSR   SPIDrvWrite
+  658:                                             0x000080FF);
+  659:      SPIDrvWrite(T1_LO_ADDR, (UINT16) (u32CounterValue & 0x0000FFFF));
+  0008 a61c     [2]             LDA   #28
+  000a 9efe05   [5]             LDHX  5,SP
+  000d cd0000   [6]             JSR   SPIDrvWrite
+  660:      /* Turn Timer1 mask on. */
+  661:      SPIDrvWrite(T1_HI_ADDR, (UINT16) ((u32CounterValue >> 16) & 0x000000FF));
+  0010 a61b     [2]             LDA   #27
+  0012 9eee04   [4]             LDX   4,SP
+  0015 8c       [1]             CLRH  
+  0016 cd0000   [6]             JSR   SPIDrvWrite
+  662:      SPIDrvWrite(T1_LO_ADDR, (UINT16) (u32CounterValue & 0x0000FFFF));
+  0019 a61c     [2]             LDA   #28
+  001b 9efe05   [5]             LDHX  5,SP
+  001e cd0000   [6]             JSR   SPIDrvWrite
+  663:      return SUCCESS;
+  0021 a677     [2]             LDA   #119
+  664:  }
+  0023 81       [6]             RTS   
+  665:  
+  666:   /*!
+  667:   * \fn UINT8 PLMEDisableMC13192Timer1(void) 
+  668:   *
+  669:   * \brief Disable MC13192 timer comparator TC1.
+  670:   *
+  671:   * \return Status
+  672:   */
+  673:  UINT8 PLMEDisableMC13192Timer1(void)
+  674:  {
+  675:      /* Load the timeout value into T1 with Timer disabled. */
+  676:      /* Clear Timer1 if in RX_MODE_WTO */
+  677:      SPIDrvWrite(T1_HI_ADDR, 0x8000);
+  0000 a61b     [2]             LDA   #27
+  0002 458000   [3]             LDHX  #-32768
+  0005 cd0000   [6]             JSR   SPIDrvWrite
+  678:      SPIDrvWrite(T1_LO_ADDR, 0x0000);
+  0008 a61c     [2]             LDA   #28
+  000a 5f       [1]             CLRX  
+  000b 8c       [1]             CLRH  
+  000c cd0000   [6]             JSR   SPIDrvWrite
+  679:      //irq_mask_reg = SPIDrvRead(IRQ_MASK);      /* NOT USED */
+  680:      //irq_mask_reg &= ~TIMER1_IRQMASK_BIT;
+  681:      //SPIDrvWrite(IRQ_MASK, irq_mask_reg);
+  682:      return SUCCESS;
+  000f a677     [2]             LDA   #119
+  683:  }
+  0011 81       [6]             RTS   
+  684:  
+  685:  /*!
+  686:   * \fn void PLMEMC13192ResetIndication (void) 
+  687:   *
+  688:   * \brief Indicate a MC13192 reset condition.
+  689:   *
+  690:   */
+  691:  void PLMEMC13192ResetIndication (void)
+  692:  {
+  693:      MLMEMC13192ResetIndication();
+  0000 cc0000   [4]             JMP   MLMEMC13192ResetIndication
+  694:  }
+  695:  
+  696:  /*!
+  697:   * \brief Force the MC13192 into a soft reset condition.
+  698:   *
+  699:   * \return Status 
+  700:   */
+  701:  UINT8 PLMEMC13192SoftReset(void)
+  702:  {
+  703:      SPIDrvWrite(RESET, 0x00);
+  0000 4f       [1]             CLRA  
+  0001 5f       [1]             CLRX  
+  0002 8c       [1]             CLRH  
+  0003 cd0000   [6]             JSR   SPIDrvWrite
+  704:      return SUCCESS;
+  0006 a677     [2]             LDA   #119
+  705:  }
+  0008 81       [6]             RTS   
+  706:  
+  707:  /*!
+  708:   * \fn UINT8 PLMEMC13192XtalAdjust(UINT8 u8TrimValue) 
+  709:   *
+  710:   * \brief Adjust the MC13192s crystal trim value.
+  711:   *
+  712:   * \param u8TrimValue Trim value
+  713:   *
+  714:   * \return Status
+  715:   */
+  716:  UINT8 PLMEMC13192XtalAdjust(UINT8 u8TrimValue)
+  717:  {
+  0000 a7fb     [2]             AIS   #-5
+  718:      UINT16 u16Reg;
+  719:      UINT16 u16RegValue;
+  720:      
+  721:      u16RegValue = (UINT16)(u8TrimValue << 8);/* 
+  0002 95       [2]             TSX   
+  0003 e701     [3]             STA   1,X
+  0005 6f02     [5]             CLR   2,X
+  722:                                                * Shift the req value into the 
+  723:                                                * higher half word 
+  724:                                                */
+  725:      u16Reg = SPIDrvRead(XTAL_ADJ_ADDR);      /* 
+  0007 a60a     [2]             LDA   #10
+  0009 cd0000   [6]             JSR   SPIDrvRead
+  000c 9eff04   [5]             STHX  4,SP
+  726:                                                * Read the current value of XTAL 
+  727:                                                * Reg 
+  728:                                                */
+  729:      u16Reg = ((u16Reg & 0x00FF) | u16RegValue);
+  000f 95       [2]             TSX   
+  0010 e604     [3]             LDA   4,X
+  0012 ea02     [3]             ORA   2,X
+  730:      SPIDrvWrite(XTAL_ADJ_ADDR, u16Reg);
+  0014 f7       [2]             STA   ,X
+  0015 fe       [3]             LDX   ,X
+  0016 9ee602   [4]             LDA   2,SP
+  0019 87       [2]             PSHA  
+  001a 8a       [3]             PULH  
+  001b a60a     [2]             LDA   #10
+  001d cd0000   [6]             JSR   SPIDrvWrite
+  731:      return SUCCESS;
+  0020 a677     [2]             LDA   #119
+  732:  }
+  0022 a705     [2]             AIS   #5
+  0024 81       [6]             RTS   
+  733:  
+  734:  /*!
+  735:   * \fn UINT8 PLMEMC13192FEGainAdjust(UINT8 i8GainValue)
+  736:   *
+  737:   * \brief Adjust the MC13192s gain compensator.
+  738:   *
+  739:   * \param i8GainValue Gain Compensation
+  740:   *
+  741:   * \return Status
+  742:   */
+  743:  UINT8 PLMEMC13192FEGainAdjust(UINT8 i8GainValue)
+  744:  {
+  0000 87       [2]             PSHA  
+  0001 a7fe     [2]             AIS   #-2
+  745:      UINT16 u16Reg;
+  746:      
+  747:      u16Reg = SPIDrvRead(FEGAIN_ADDR);       /* 
+  0003 a604     [2]             LDA   #4
+  0005 cd0000   [6]             JSR   SPIDrvRead
+  0008 9eff01   [5]             STHX  1,SP
+  748:                                               * Read the current value of GAIN 
+  749:                                               * Reg 
+  750:                                               */
+  751:      u16Reg = ((u16Reg & 0xFF00) | i8GainValue);
+  752:      SPIDrvWrite(FEGAIN_ADDR, u16Reg);
+  000b 9eee03   [4]             LDX   3,SP
+  000e 9ee601   [4]             LDA   1,SP
+  0011 87       [2]             PSHA  
+  0012 8a       [3]             PULH  
+  0013 a604     [2]             LDA   #4
+  0015 cd0000   [6]             JSR   SPIDrvWrite
+  753:      return SUCCESS;
+  0018 a677     [2]             LDA   #119
+  754:  }
+  001a a703     [2]             AIS   #3
+  001c 81       [6]             RTS   
+  755:  
+  756:   /*!
+  757:   * \fn UINT8 PLMEMC13192PAOutputAdjust(UINT8 u8RequestedPAValue)
+  758:   *
+  759:   * \brief Adjust the MC13192s Output power.
+  760:   *
+  761:   * \param u8RequestedPAValue PA output adjust
+  762:   *
+  763:   * \return Status
+  764:   */
+  765:  UINT8 PLMEMC13192PAOutputAdjust(UINT8 u8RequestedPAValue)
+  766:  {
+  0000 87       [2]             PSHA  
+  0001 a7fd     [2]             AIS   #-3
+  767:      UINT16 u16Reg;
+  768:      UINT8 u8PAValue;
+  769:      
+  770:      switch (u8RequestedPAValue)
+  0003 413208   [4]             CBEQA #50,LE ;abs = 000e
+  0006 a164     [2]             CMP   #100
+  0008 2609     [3]             BNE   L13 ;abs = 0013
+  771:      {
+  772:          case MAX_POWER:         /* Sets the PA drive level and PA gain to MAX */
+  773:              u8PAValue = 0xFF;
+  000a a6ff     [2]             LDA   #-1
+  774:          break;
+  000c 200d     [3]             BRA   L1B ;abs = 001b
+  000e          LE:     
+  775:  
+  776:          case MIN_POWER:
+  777:              u8PAValue = 0x00;   /* Sets the PA drive level and PA gain to MIN */
+  000e 9e6f03   [6]             CLR   3,SP
+  778:          break;
+  0011 200b     [3]             BRA   L1E ;abs = 001e
+  0013          L13:    
+  779:  
+  780:          default:
+  781:              if (u8RequestedPAValue > 15) {
+  0013 a10f     [2]             CMP   #15
+  0015 2304     [3]             BLS   L1B ;abs = 001b
+  782:                  return OVERFLOW;
+  0017 a601     [2]             LDA   #1
+  0019 2039     [3]             BRA   L54 ;abs = 0054
+  001b          L1B:    
+  783:              }
+  784:              else {                
+  785:                  u8PAValue = u8RequestedPAValue;
+  001b 9ee703   [4]             STA   3,SP
+  001e          L1E:    
+  786:              }
+  787:          break;
+  788:      }
+  789:      
+  790:      u16Reg = SPIDrvRead(PA_ADJUST_ADDR);    /* 
+  001e a612     [2]             LDA   #18
+  0020 cd0000   [6]             JSR   SPIDrvRead
+  0023 9eff01   [5]             STHX  1,SP
+  791:                                               * Read the current value of GAIN 
+  792:                                               * Register 
+  793:                                               */
+  794:      u16Reg &= 0xFF00;
+  0026 95       [2]             TSX   
+  0027 6f01     [5]             CLR   1,X
+  795:      
+  796:      if ((u8RequestedPAValue == MAX_POWER) || (u8RequestedPAValue == MIN_POWER)){
+  0029 e603     [3]             LDA   3,X
+  002b 416404   [4]             CBEQA #100,L32 ;abs = 0032
+  002e a132     [2]             CMP   #50
+  0030 2607     [3]             BNE   L39 ;abs = 0039
+  0032          L32:    
+  797:          u16Reg |= u8PAValue;
+  0032 e602     [3]             LDA   2,X
+  0034 e701     [3]             STA   1,X
+  0036 f6       [3]             LDA   ,X
+  798:      }
+  0037 2010     [3]             BRA   L49 ;abs = 0049
+  0039          L39:    
+  799:      else {
+  800:          u16Reg |= ((u8PAValue << 4) | 0x000C);
+  0039 e602     [3]             LDA   2,X
+  003b ae10     [2]             LDX   #16
+  003d 42       [5]             MUL   
+  003e aa0c     [2]             ORA   #12
+  0040 9eea02   [4]             ORA   2,SP
+  0043 9ee702   [4]             STA   2,SP
+  0046 9f       [1]             TXA   
+  0047 95       [2]             TSX   
+  0048 fa       [3]             ORA   ,X
+  0049          L49:    
+  0049 f7       [2]             STA   ,X
+  801:      }
+  802:      SPIDrvWrite(PA_ADJUST_ADDR, u16Reg);
+  004a a612     [2]             LDA   #18
+  004c 9efe01   [5]             LDHX  1,SP
+  004f cd0000   [6]             JSR   SPIDrvWrite
+  803:      return SUCCESS;
+  0052 a677     [2]             LDA   #119
+  0054          L54:    
+  804:  }
+  0054 a704     [2]             AIS   #4
+  0056 81       [6]             RTS   
+  805:  
+  806:  /*!
+  807:   * \fn UINT8 PLMEGetRficVersion(void)
+  808:   *
+  809:   * \brief Returns the RFIC version number.
+  810:   *
+  811:   * \return Version number 
+  812:   */
+  813:  UINT8 PLMEGetRficVersion(void)
+  814:  {
+  0000 a7fe     [2]             AIS   #-2
+  815:      UINT16 u16Reg;
+  816:      
+  817:      u16Reg = SPIDrvRead(VERSION_REG);   /* 
+  0002 a62c     [2]             LDA   #44
+  0004 cd0000   [6]             JSR   SPIDrvRead
+  0007 9eff01   [5]             STHX  1,SP
+  818:                                           * Read the version register 
+  819:                                           * version[12:10] 
+  820:                                           */
+  821:      u16Reg &= VERSION_MASK;             /* Shift to generate accurate number */
+  000a 95       [2]             TSX   
+  000b 6f01     [5]             CLR   1,X
+  000d f6       [3]             LDA   ,X
+  000e a41c     [2]             AND   #28
+  0010 f7       [2]             STA   ,X
+  822:      
+  823:      u16Reg = u16Reg >> 10;              /* Hard coded to shift */
+  0011 74       [4]             LSR   ,X
+  0012 6601     [5]             ROR   1,X
+  0014 74       [4]             LSR   ,X
+  0015 6601     [5]             ROR   1,X
+  0017 74       [4]             LSR   ,X
+  0018 6601     [5]             ROR   1,X
+  001a 74       [4]             LSR   ,X
+  001b 6601     [5]             ROR   1,X
+  001d 74       [4]             LSR   ,X
+  001e 6601     [5]             ROR   1,X
+  0020 74       [4]             LSR   ,X
+  0021 6601     [5]             ROR   1,X
+  0023 74       [4]             LSR   ,X
+  0024 6601     [5]             ROR   1,X
+  0026 74       [4]             LSR   ,X
+  0027 6601     [5]             ROR   1,X
+  0029 74       [4]             LSR   ,X
+  002a 6601     [5]             ROR   1,X
+  002c 74       [4]             LSR   ,X
+  002d 6601     [5]             ROR   1,X
+  824:      return (UINT8) u16Reg;
+  002f e601     [3]             LDA   1,X
+  825:  }
+  0031 a702     [2]             AIS   #2
+  0033 81       [6]             RTS   
+  826:  /*!
+  827:   * \fn void PLMELoadPRBS9 (tTxPacket *psPacket)
+  828:   *
+  829:   * \brief Loads the transmit RAM with a PRBS9 data pattern.
+  830:   *
+  831:   * \param  *psPacket Transmit buffer pointer
+  832:   *
+  833:   */
+  834:  void PLMELoadPRBS9 (tTxPacket *psPacket)
+  835:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7f9     [2]             AIS   #-7
+  836:    UINT8 u8c1;                           /* Byte counter */
+  837:    UINT8 u8c2;                           /* Bit counter */
+  838:    UINT16 u16t1;                         /* LFSR */
+  839:    UINT16 u16t2;                         /* LFSR output */
+  840:    UINT16 u16t3;                         /* LFSR feedback tap */
+  841:    UINT8 u8t4;                           /* Assembled transmit byte */
+  842:    
+  843:      u16t1 = 0x01FF;                     /* Initialize the LFSR */
+  0004 4501ff   [3]             LDHX  #511
+  0007 9eff01   [5]             STHX  1,SP
+  844:      for (u8c1=0; u8c1<64; u8c1++)       /* Byte counter */
+  000a 9e6f04   [6]             CLR   4,SP
+  000d          LD:     
+  845:      {
+  846:          u8t4 = 0x00;                    /* Initialize the byte */
+  000d 95       [2]             TSX   
+  000e 6f02     [5]             CLR   2,X
+  847:      for (u8c2=0; u8c2<8; u8c2++)        /* Bit counter */
+  0010 6f04     [5]             CLR   4,X
+  0012          L12:    
+  848:      {
+  849:          u16t2 = (u16t1 & 0x0001);       /* LFSR output */
+  0012 e601     [3]             LDA   1,X
+  0014 a401     [2]             AND   #1
+  0016 8c       [1]             CLRH  
+  0017 97       [1]             TAX   
+  0018 9eff06   [5]             STHX  6,SP
+  850:          if (u16t2 == 0x0001)
+  001b 650001   [3]             CPHX  #1
+  001e 2607     [3]             BNE   L27 ;abs = 0027
+  851:          {
+  852:              u8t4 = (UINT8)(u8t4 | 0x80);         /* Set/Clear byte based on LFSR output */
+  0020 95       [2]             TSX   
+  0021 e602     [3]             LDA   2,X
+  0023 aa80     [2]             ORA   #-128
+  0025 e702     [3]             STA   2,X
+  0027          L27:    
+  853:          }
+  854:          if (u8c2 != 7)
+  0027 9ee605   [4]             LDA   5,SP
+  002a 410703   [4]             CBEQA #7,L30 ;abs = 0030
+  855:          {
+  856:              u8t4 = (UINT8)(u8t4 >> 1);           /* LSBit will be first bit out of LFSR */
+  002d 9e6403   [6]             LSR   3,SP
+  0030          L30:    
+  857:          }
+  858:          u16t3 = ((u16t1 & 0x0010) >> 4);/* LFSR tap */
+  0030 9ee602   [4]             LDA   2,SP
+  0033 a410     [2]             AND   #16
+  0035 87       [2]             PSHA  
+  0036 4f       [1]             CLRA  
+  0037 88       [3]             PULX  
+  0038 44       [1]             LSRA  
+  0039 56       [1]             RORX  
+  003a 44       [1]             LSRA  
+  003b 56       [1]             RORX  
+  003c 44       [1]             LSRA  
+  003d 56       [1]             RORX  
+  003e 44       [1]             LSRA  
+  003f 56       [1]             RORX  
+  859:          u16t1 = u16t1 >> 1;             /* Now shift the LFSR */
+  0040 9e6401   [6]             LSR   1,SP
+  0043 9e6602   [6]             ROR   2,SP
+  860:          if (u16t2 == u16t3)             /* Set/Clr the LFSR MSBit */
+  0046 87       [2]             PSHA  
+  0047 8a       [3]             PULH  
+  0048 9ef306   [6]             CPHX  6,SP
+  004b 2606     [3]             BNE   L53 ;abs = 0053
+  861:          {
+  862:              u16t1 = u16t1 & 0xFEFF;
+  004d 95       [2]             TSX   
+  004e f6       [3]             LDA   ,X
+  004f a4fe     [2]             AND   #-2
+  863:          }
+  0051 2004     [3]             BRA   L57 ;abs = 0057
+  0053          L53:    
+  864:          else
+  865:          {
+  866:              u16t1 = u16t1 | 0x0100;
+  0053 95       [2]             TSX   
+  0054 f6       [3]             LDA   ,X
+  0055 aa01     [2]             ORA   #1
+  0057          L57:    
+  0057 f7       [2]             STA   ,X
+  0058 6c04     [5]             INC   4,X
+  005a e604     [3]             LDA   4,X
+  005c a108     [2]             CMP   #8
+  005e 25b2     [3]             BCS   L12 ;abs = 0012
+  867:          }
+  868:      }
+  869:      psPacket->pu8Data[u8c1] = u8t4;
+  0060 9efe08   [5]             LDHX  8,SP
+  0063 9ee604   [4]             LDA   4,SP
+  0066 eb02     [3]             ADD   2,X
+  0068 87       [2]             PSHA  
+  0069 4f       [1]             CLRA  
+  006a e901     [3]             ADC   1,X
+  006c 87       [2]             PSHA  
+  006d 9ee605   [4]             LDA   5,SP
+  0070 8a       [3]             PULH  
+  0071 88       [3]             PULX  
+  0072 f7       [2]             STA   ,X
+  0073 95       [2]             TSX   
+  0074 6c03     [5]             INC   3,X
+  0076 e603     [3]             LDA   3,X
+  0078 a140     [2]             CMP   #64
+  007a 2591     [3]             BCS   LD ;abs = 000d
+  870:      }
+  871:      psPacket->u8DataLength = 64;
+  007c 9efe08   [5]             LDHX  8,SP
+  007f a640     [2]             LDA   #64
+  0081 f7       [2]             STA   ,X
+  872:      RAMDrvWriteTx(psPacket);            /* Load the data into packet RAM */
+  0082 cd0000   [6]             JSR   RAMDrvWriteTx
+  873:  }
+  0085 a709     [2]             AIS   #9
+  0087 81       [6]             RTS   
+  874:  
+  875:  UINT8  PLMEEnablePromiscuousMode(void)
+  876:  {
+  877:  //  gsPhyOptions.Bits.u1PromiscuousMode = TRUE;
+  878:    return SUCCESS;
+  0000 a677     [2]             LDA   #119
+  879:  }
+  0002 81       [6]             RTS   
+  880:  UINT8  PLMEDisablePromiscuousMode(void)
+  881:  {
+  882:  //  gsPhyOptions.Bits.u1PromiscuousMode = FALSE;
+  883:    return SUCCESS;
+  0000 a677     [2]             LDA   #119
+  884:  }
+  0002 81       [6]             RTS   

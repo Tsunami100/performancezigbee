@@ -1,0 +1,517 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /**
+    2:   * Copyright (c) 2004, Freescale Semiconductor
+    3:   * Freescale Confidential Proprietary
+    4:   *
+    5:   * File name :  SCI.c
+    6:   * Project name: SMAC (Simple Media Access Controller)
+    7:   *
+    8:   * Department : Freescale Radio Products Division
+    9:   *
+   10:   * Description : SCI module functions.
+   11:   *
+   12:   * $Author: a20639 $
+   13:   * $Date: 2006/08/22 23:44:58 $
+   14:   * $Name:  $
+   15:   */
+   16:  
+   17:  #include <string.h>
+   18:  #include "derivative.h"
+   19:  #include "freescale_radio_hardware.h"
+   20:  #include "SCI.h"
+   21:  
+   22:  
+   23:  UINT8 gu8SCIData[128] ;
+   24:  UINT8 gu8SCIDataFlag; 
+   25:  
+   26:  
+   27:  void SCIInit(void)
+   28:  {
+   29:      SCIBDH = 0x00;
+  0000 3f00     [5]             CLR   _SCI2BD
+   30:      SCIBDL = BAUD_38400;
+  0002 6e0d01   [4]             MOV   #13,_SCI2BD:1
+   31:      SCIC2 = INIT_SCI2C2;
+  0005 6e2c00   [4]             MOV   #44,_SCI2C2
+   32:  }
+  0008 81       [6]             RTS   
+   33:  /************************************************************
+   34:  Function: SCIInitGeneric
+   35:  arg types (u16, u16, u8)
+   36:  
+   37:  Function initializing the SCI to the requested baud rate
+   38:  based on the supplied busclock in kilohertz on the com port
+   39:  that is selected
+   40:  
+   41:  ************************************************************/
+   42:  
+   43:  
+   44:  
+   45:  void SCIInitGeneric(UINT32 u32BusClock, UINT32 u32BaudRate, UINT8 u8ComNumber) {
+  0000 87       [2]             PSHA  
+  0001 a7fe     [2]             AIS   #-2
+   46:     
+   47:     UINT16 u16Sbr = 0;   
+  0003 95       [2]             TSX   
+  0004 6f01     [5]             CLR   1,X
+  0006 7f       [4]             CLR   ,X
+   48:     u16Sbr = (UINT16) ((u32BusClock) / (u32BaudRate * 16));
+  0007 af05     [2]             AIX   #5
+  0009 a604     [2]             LDA   #4
+  000b cd0000   [6]             JSR   _LLSL
+  000e 95       [2]             TSX   
+  000f 89       [2]             PSHX  
+  0010 8b       [2]             PSHH  
+  0011 af0d     [2]             AIX   #13
+  0013 cd0000   [6]             JSR   _LDIVU
+  0016 95       [2]             TSX   
+  0017 e602     [3]             LDA   2,X
+  0019 87       [2]             PSHA  
+  001a ee03     [3]             LDX   3,X
+  001c 8a       [3]             PULH  
+  001d 9eff09   [5]             STHX  9,SP
+   49:     
+   50:     switch (u8ComNumber) {
+  0020 9ee60b   [4]             LDA   11,SP
+  0023 a101     [2]             CMP   #1
+  0025 a708     [2]             AIS   #8
+  0027 2706     [3]             BEQ   L2F ;abs = 002f
+  0029 a102     [2]             CMP   #2
+  002b 2602     [3]             BNE   L2F ;abs = 002f
+  002d 2027     [3]             BRA   L56 ;abs = 0056
+  002f          L2F:    
+   51:        case 1:
+   52:           SCI1BDL = (UINT8) u16Sbr;
+  002f 9ee602   [4]             LDA   2,SP
+  0032 b701     [3]             STA   _SCI1BD:1
+   53:           u16Sbr = u16Sbr >> 8;
+  0034 95       [2]             TSX   
+  0035 74       [4]             LSR   ,X
+  0036 6601     [5]             ROR   1,X
+  0038 74       [4]             LSR   ,X
+  0039 6601     [5]             ROR   1,X
+  003b 74       [4]             LSR   ,X
+  003c 6601     [5]             ROR   1,X
+  003e 74       [4]             LSR   ,X
+  003f 6601     [5]             ROR   1,X
+  0041 74       [4]             LSR   ,X
+  0042 6601     [5]             ROR   1,X
+  0044 74       [4]             LSR   ,X
+  0045 6601     [5]             ROR   1,X
+  0047 74       [4]             LSR   ,X
+  0048 6601     [5]             ROR   1,X
+  004a 74       [4]             LSR   ,X
+  004b 6601     [5]             ROR   1,X
+   54:           SCI1BDH = (UINT8) u16Sbr;
+  004d e601     [3]             LDA   1,X
+  004f b700     [3]             STA   _SCI1BD
+   55:           SCI1C2 = INIT_SCI2C2;   
+  0051 6e2c00   [4]             MOV   #44,_SCI1C2
+  0054 2025     [3]             BRA   L7B ;abs = 007b
+  0056          L56:    
+   56:           break;
+   57:        
+   58:        case 2:
+   59:           SCI2BDL = (UINT8) u16Sbr;
+  0056 9ee602   [4]             LDA   2,SP
+  0059 b701     [3]             STA   _SCI2BD:1
+   60:           u16Sbr = u16Sbr >> 8;
+  005b 95       [2]             TSX   
+  005c 74       [4]             LSR   ,X
+  005d 6601     [5]             ROR   1,X
+  005f 74       [4]             LSR   ,X
+  0060 6601     [5]             ROR   1,X
+  0062 74       [4]             LSR   ,X
+  0063 6601     [5]             ROR   1,X
+  0065 74       [4]             LSR   ,X
+  0066 6601     [5]             ROR   1,X
+  0068 74       [4]             LSR   ,X
+  0069 6601     [5]             ROR   1,X
+  006b 74       [4]             LSR   ,X
+  006c 6601     [5]             ROR   1,X
+  006e 74       [4]             LSR   ,X
+  006f 6601     [5]             ROR   1,X
+  0071 74       [4]             LSR   ,X
+  0072 6601     [5]             ROR   1,X
+   61:           SCI2BDH = (UINT8) u16Sbr;
+  0074 e601     [3]             LDA   1,X
+  0076 b700     [3]             STA   _SCI2BD
+   62:           SCI2C2 = INIT_SCI2C2;
+  0078 6e2c00   [4]             MOV   #44,_SCI2C2
+  007b          L7B:    
+   63:           break;
+   64:           
+   65:        default:
+   66:           SCI1BDL = (UINT8) u16Sbr;
+   67:           u16Sbr = u16Sbr >> 8;
+   68:           SCI1BDH = (UINT8) u16Sbr;
+   69:           SCI1C2 = INIT_SCI2C2;   
+   70:           break;
+   71:     }   
+   72:  }
+  007b a703     [2]             AIS   #3
+  007d 81       [6]             RTS   
+   73:  
+   74:  interrupt void Vscirx()
+   75:  {    
+  0000 8b       [2]             PSHH  
+  0001          L1:     
+   76:      UINT8 u8status, u8dummy;
+   77:      /* ensure Rx data buffer is full */
+   78:      do 
+   79:      {
+   80:          u8status = SCIS1;
+  0001 b600     [3]             LDA   _SCI2S1
+   81:      } while ((u8status & 0x20) == 0);
+  0003 a520     [2]             BIT   #32
+  0005 27fa     [3]             BEQ   L1 ;abs = 0001
+   82:      
+   83:      /* Check for Errors (Framing, Noise, Parity) */
+   84:      if ((u8status & 0x07) != 0) 
+  0007 a507     [2]             BIT   #7
+  0009 2704     [3]             BEQ   LF ;abs = 000f
+   85:      {
+   86:          u8dummy = SCID;
+  000b b600     [3]             LDA   _SCI2D
+   87:          return;
+  000d 200d     [3]             BRA   L1C ;abs = 001c
+  000f          LF:     
+   88:      }
+   89:  
+   90:      /* Good Data. */
+   91:      gu8SCIData[0] = SCID; /* load SCI register to data */
+  000f b600     [3]             LDA   _SCI2D
+  0011 c70000   [4]             STA   gu8SCIData
+   92:      gu8SCIData[1] = 0; 
+  0014 4f       [1]             CLRA  
+  0015 c70001   [4]             STA   gu8SCIData:1
+   93:      gu8SCIDataFlag = 1;
+  0018 4c       [1]             INCA  
+  0019 c70000   [4]             STA   gu8SCIDataFlag
+  001c          L1C:    
+   94:  }
+  001c 8a       [3]             PULH  
+  001d 80       [9]             RTI   
+   95:  
+   96:  void SCITransmitArray(UINT8 *pStr, UINT8 length)
+   97:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 87       [2]             PSHA  
+   98:      UINT8 i;
+   99:      for (i=0; i<length; i++)
+  0003 4f       [1]             CLRA  
+  0004 2011     [3]             BRA   L17 ;abs = 0017
+  0006          L6:     
+  100:      {
+  101:          SCIStartTransmit(pStr[i]);
+  0006 87       [2]             PSHA  
+  0007 95       [2]             TSX   
+  0008 eb03     [3]             ADD   3,X
+  000a 87       [2]             PSHA  
+  000b 4f       [1]             CLRA  
+  000c e902     [3]             ADC   2,X
+  000e 87       [2]             PSHA  
+  000f 8a       [3]             PULH  
+  0010 88       [3]             PULX  
+  0011 f6       [3]             LDA   ,X
+  0012 cd0000   [6]             JSR   SCIStartTransmit
+  0015 86       [3]             PULA  
+  0016 4c       [1]             INCA  
+  0017          L17:    
+  0017 95       [2]             TSX   
+  0018 f1       [3]             CMP   ,X
+  0019 25eb     [3]             BCS   L6 ;abs = 0006
+  102:      }
+  103:  }
+  001b a703     [2]             AIS   #3
+  001d 81       [6]             RTS   
+  104:  
+  105:  void SCIStartTransmit(UINT8 cData)
+  106:  {
+  107:      while (!SCIS1_TDRE);  /* ensure Tx data buffer empty */
+  0000 97       [1]             TAX   
+  0001          L1:     
+  0001 b600     [3]             LDA   _SCI2S1
+  0003 a480     [2]             AND   #-128
+  0005 27fa     [3]             BEQ   L1 ;abs = 0001
+  108:      SCID = cData; /* load data to SCI2 register */
+  0007 bf00     [3]             STX   _SCI2D
+  0009          L9:     
+  109:      while (!SCIS1_TC); /* wait for Tx complete */
+  0009 b600     [3]             LDA   _SCI2S1
+  000b a440     [2]             AND   #64
+  000d 27fa     [3]             BEQ   L9 ;abs = 0009
+  110:  }
+  000f 81       [6]             RTS   
+  111:  
+  112:  void SCITransmitStr(UINT8 *pStr)
+  113:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7fc     [2]             AIS   #-4
+  114:      UINT16 i;
+  115:      UINT16 nStrLen=strlen(pStr);
+  0004 cd0000   [6]             JSR   strlen
+  0007 9eff03   [5]             STHX  3,SP
+  116:      
+  117:      for (i=0; i<nStrLen; i++)
+  000a 95       [2]             TSX   
+  000b 6f01     [5]             CLR   1,X
+  000d 7f       [4]             CLR   ,X
+  000e 2015     [3]             BRA   L25 ;abs = 0025
+  0010          L10:    
+  118:      {
+  119:          SCIStartTransmit(pStr[i]);
+  0010 95       [2]             TSX   
+  0011 e605     [3]             LDA   5,X
+  0013 eb01     [3]             ADD   1,X
+  0015 87       [2]             PSHA  
+  0016 f6       [3]             LDA   ,X
+  0017 e904     [3]             ADC   4,X
+  0019 87       [2]             PSHA  
+  001a 8a       [3]             PULH  
+  001b 88       [3]             PULX  
+  001c f6       [3]             LDA   ,X
+  001d ad00     [5]             BSR   SCIStartTransmit
+  001f 95       [2]             TSX   
+  0020 6c01     [5]             INC   1,X
+  0022 2601     [3]             BNE   L25 ;abs = 0025
+  0024 7c       [4]             INC   ,X
+  0025          L25:    
+  0025 9efe03   [5]             LDHX  3,SP
+  0028 9ef301   [6]             CPHX  1,SP
+  002b 22e3     [3]             BHI   L10 ;abs = 0010
+  120:      }
+  121:  }
+  002d a706     [2]             AIS   #6
+  002f 81       [6]             RTS   
+  122:  
+  123:  UINT8 SCIgets(char *pPrompt, char *pBuffer, UINT8 u8Size) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 87       [2]             PSHA  
+  0003 a7fe     [2]             AIS   #-2
+  124:  
+  125:     
+  126:     UINT8 u8ExitFlag = FALSE;
+  127:     UINT8 u8Offset=0;
+  0005 95       [2]             TSX   
+  0006 6f01     [5]             CLR   1,X
+  128:     
+  129:     //Echo the string for the command line
+  130:     SCITransmitStr(pPrompt);
+  0008 9efe08   [5]             LDHX  8,SP
+  000b ad00     [5]             BSR   SCITransmitStr
+  131:     
+  132:     //Keep processing SCI inputs until Size is reached or terminating NULL
+  133:     //occurs.
+  134:     while (u8ExitFlag == FALSE) {
+  000d 4f       [1]             CLRA  
+  000e          LE:     
+  135:        if (gu8SCIDataFlag == 1) {
+  000e ce0000   [4]             LDX   gu8SCIDataFlag
+  0011 5b6c     [4]             DBNZX L7F ;abs = 007f
+  136:           gu8SCIDataFlag = 0;
+  0013 95       [2]             TSX   
+  0014 f7       [2]             STA   ,X
+  0015 4f       [1]             CLRA  
+  0016 c70000   [4]             STA   gu8SCIDataFlag
+  137:        
+  138:           
+  139:           //Check the terminating string
+  140:           switch (gu8SCIData[0]) {
+  0019 ce0000   [4]             LDX   gu8SCIData
+  001c 510815   [4]             CBEQX #8,L34 ;abs = 0034
+  001f a30d     [2]             CPX   #13
+  0021 263b     [3]             BNE   L5E ;abs = 005e
+  141:           
+  142:              //Check for Terminating string
+  143:              case 0x0D:
+  144:                 u8ExitFlag = TRUE;
+  145:                 pBuffer[u8Offset] = 0; //Terminate sting with null.
+  0023 95       [2]             TSX   
+  0024 e601     [3]             LDA   1,X
+  0026 eb04     [3]             ADD   4,X
+  0028 87       [2]             PSHA  
+  0029 4f       [1]             CLRA  
+  002a e903     [3]             ADC   3,X
+  002c 87       [2]             PSHA  
+  002d 8a       [3]             PULH  
+  002e 88       [3]             PULX  
+  002f 7f       [4]             CLR   ,X
+  146:                 break;
+  0030 a601     [2]             LDA   #1
+  0032 2041     [3]             BRA   L75 ;abs = 0075
+  0034          L34:    
+  147:                 
+  148:              case '\b':
+  149:                 if (u8Offset != 0)
+  0034 9e6d02   [5]             TST   2,SP
+  0037 2716     [3]             BEQ   L4F ;abs = 004f
+  150:                    pBuffer[u8Offset--] = 0;
+  0039 9eee02   [4]             LDX   2,SP
+  003c 89       [2]             PSHX  
+  003d 5a       [1]             DECX  
+  003e 9eef03   [4]             STX   3,SP
+  0041 86       [3]             PULA  
+  0042 95       [2]             TSX   
+  0043 eb04     [3]             ADD   4,X
+  0045 87       [2]             PSHA  
+  0046 4f       [1]             CLRA  
+  0047 e903     [3]             ADC   3,X
+  0049 87       [2]             PSHA  
+  004a 8a       [3]             PULH  
+  004b 88       [3]             PULX  
+  004c 7f       [4]             CLR   ,X
+  004d 2024     [3]             BRA   L73 ;abs = 0073
+  004f          L4F:    
+  151:                 else
+  152:                    pBuffer[u8Offset] = 0;
+  004f 95       [2]             TSX   
+  0050 e601     [3]             LDA   1,X
+  0052 eb04     [3]             ADD   4,X
+  0054 87       [2]             PSHA  
+  0055 4f       [1]             CLRA  
+  0056 e903     [3]             ADC   3,X
+  0058 87       [2]             PSHA  
+  0059 8a       [3]             PULH  
+  005a 88       [3]             PULX  
+  005b 7f       [4]             CLR   ,X
+  005c 2015     [3]             BRA   L73 ;abs = 0073
+  005e          L5E:    
+  153:                 break;
+  154:              
+  155:              case '\n':
+  156:              default:
+  157:                 pBuffer[u8Offset++] = gu8SCIData[0];
+  005e 95       [2]             TSX   
+  005f e601     [3]             LDA   1,X
+  0061 87       [2]             PSHA  
+  0062 4c       [1]             INCA  
+  0063 e701     [3]             STA   1,X
+  0065 86       [3]             PULA  
+  0066 eb04     [3]             ADD   4,X
+  0068 87       [2]             PSHA  
+  0069 4f       [1]             CLRA  
+  006a e903     [3]             ADC   3,X
+  006c 87       [2]             PSHA  
+  006d 8a       [3]             PULH  
+  006e 88       [3]             PULX  
+  006f c60000   [4]             LDA   gu8SCIData
+  0072 f7       [2]             STA   ,X
+  0073          L73:    
+  158:                 break;
+  0073 95       [2]             TSX   
+  0074 f6       [3]             LDA   ,X
+  0075          L75:    
+  159:           }
+  160:           
+  161:           
+  162:           
+  163:           
+  164:           //Check the buffersize not to overrun buffer.
+  165:           
+  166:           
+  167:           if (u8Offset == u8Size) {
+  0075 9eee03   [4]             LDX   3,SP
+  0078 9ee302   [4]             CPX   2,SP
+  007b 2602     [3]             BNE   L7F ;abs = 007f
+  168:              u8ExitFlag = TRUE;
+  169:           }
+  170:        }
+  171:     }
+  007d a601     [2]             LDA   #1
+  007f          L7F:    
+  007f 4d       [1]             TSTA  
+  0080 278c     [3]             BEQ   LE ;abs = 000e
+  172:     
+  173:     return u8Offset;
+  0082 9ee602   [4]             LDA   2,SP
+  174:     
+  175:  }
+  0085 a705     [2]             AIS   #5
+  0087 81       [6]             RTS   
+  176:  
+  177:  void SCITransmitFormattedArray(char *pStr, UINT8 length)
+  178:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 87       [2]             PSHA  
+  0003 a7fc     [2]             AIS   #-4
+  179:  	int i;
+  180:  	UINT8 low_nibble=0, hi_nibble=0;
+  181:  	UINT8 fourbit=0;
+  182:  	
+  183:  	for (i=0; i<length; i++) {
+  0005 95       [2]             TSX   
+  0006 6f01     [5]             CLR   1,X
+  0008 7f       [4]             CLR   ,X
+  0009 203e     [3]             BRA   L49 ;abs = 0049
+  000b          LB:     
+  184:  	
+  185:  	   low_nibble = pStr[i] & 0x0F;
+  000b 95       [2]             TSX   
+  000c e606     [3]             LDA   6,X
+  000e eb01     [3]             ADD   1,X
+  0010 87       [2]             PSHA  
+  0011 f6       [3]             LDA   ,X
+  0012 e905     [3]             ADC   5,X
+  0014 87       [2]             PSHA  
+  0015 8a       [3]             PULH  
+  0016 88       [3]             PULX  
+  0017 f6       [3]             LDA   ,X
+  0018 87       [2]             PSHA  
+  0019 a40f     [2]             AND   #15
+  001b 95       [2]             TSX   
+  001c e703     [3]             STA   3,X
+  186:  	   hi_nibble = (pStr[i] & 0xF0) >> 4;
+  001e 86       [3]             PULA  
+  001f a4f0     [2]             AND   #-16
+  0021 62       [1]             NSA   
+  0022 a40f     [2]             AND   #15
+  0024 e704     [3]             STA   4,X
+  187:  	   
+  188:  	   if (hi_nibble <= 9) {
+  0026 a109     [2]             CMP   #9
+  0028 2204     [3]             BHI   L2E ;abs = 002e
+  189:  	      SCIStartTransmit(hi_nibble + 0x30);
+  002a ab30     [2]             ADD   #48
+  190:  	   } else {
+  002c 2002     [3]             BRA   L30 ;abs = 0030
+  002e          L2E:    
+  191:  	      SCIStartTransmit(hi_nibble + 0x37);
+  002e ab37     [2]             ADD   #55
+  0030          L30:    
+  0030 cd0000   [6]             JSR   SCIStartTransmit
+  192:  	   }
+  193:  	   
+  194:  	   if (low_nibble <= 9) {
+  0033 9ee603   [4]             LDA   3,SP
+  0036 a109     [2]             CMP   #9
+  0038 2204     [3]             BHI   L3E ;abs = 003e
+  195:  	      SCIStartTransmit(low_nibble + 0x30);
+  003a ab30     [2]             ADD   #48
+  196:  	   } else {
+  003c 2002     [3]             BRA   L40 ;abs = 0040
+  003e          L3E:    
+  197:  	      SCIStartTransmit(low_nibble + 0x37);
+  003e ab37     [2]             ADD   #55
+  0040          L40:    
+  0040 cd0000   [6]             JSR   SCIStartTransmit
+  0043 95       [2]             TSX   
+  0044 6c01     [5]             INC   1,X
+  0046 2601     [3]             BNE   L49 ;abs = 0049
+  0048 7c       [4]             INC   ,X
+  0049          L49:    
+  0049 ee04     [3]             LDX   4,X
+  004b 8c       [1]             CLRH  
+  004c 9ef301   [6]             CPHX  1,SP
+  004f 92ba     [3]             BGT   LB ;abs = 000b
+  198:  	   }
+  199:  	}
+  200:  }
+  0051 a707     [2]             AIS   #7
+  0053 81       [6]             RTS   
+  201:  
