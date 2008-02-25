@@ -1,0 +1,381 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /*!
+    2:   * Copyright (c) 2005, Freescale Semiconductor
+    3:   *
+    4:   * Freescale Confidential Proprietary
+    5:   * \file    mcu_hw_config.c
+    6:   * \brief   MCU Hardware configuration routines.
+    7:   * \author  a20639
+    8:   * \version 4.1a
+    9:   * \date    2005/08/11 20:44:37 
+   10:   * 
+   11:   * \b Description:
+   12:   *
+   13:   * This file contains the functions to manage the clock, 
+   14:   * COP, GPIO, SPI and IRQ. 
+   15:   *
+   16:   * \b Department: Freescale Radio Products Division 
+   17:   *
+   18:   * \b Project: SMAC (Simple Media Access Controller)
+   19:   *
+   20:   * \b History:
+   21:   * - 11/16/2005 Doc. update to Doxygen compliant by Gonzalo Delgado 
+   22:   * Huitron rgd04c
+   23:   */ 
+   24:   
+   25:  
+   26:  
+   27:  #include "mcu_hw_config.h"
+   28:  #include "simple_phy.h"
+   29:  #include "mcu_spi_config.h"
+   30:  #include "drivers.h"
+   31:  
+   32:  /*! Global Variables */
+   33:  extern UINT8 gu8RTxMode;
+   34:   
+   35:  
+   36:  #if defined (HCS08G) | defined (HCS08R) | defined (MC1321X) 
+   37:  /*!
+   38:    \fn void UseExternalClock() 
+   39:    \brief	This function configures the use of the external clock.
+   40:     Switch the MCU from internal to MC13192 supplied clock.
+   41:       The MCU FLL is not engaged.
+   42:    \warning This function is executed if the core is a member of the
+   43:             HCS08G family       
+   44:    
+   45:  */
+   46:  void UseExternalClock(void) //use_external_clock()
+   47:  {
+   48:      ICGC1 = 0x50;    /* 
+  0000 6e5000   [4]             MOV   #80,_ICGC1
+  0003          L3:     
+   49:                        *  0b01010000
+   50:                        *    ||||||||__ Unimplemented
+   51:                        *    |||||||___ Unimplemented
+   52:                        *    ||||||____ Oscillator disabled when ICG is in 
+   53:                        *    |||||      off mode
+   54:                        *    |||||
+   55:                        *    ||||+_____ FLL bypassed, external reference
+   56:                        *    |||_______ External Clock Requested
+   57:                        *    ||________ Osc configured for High Frequency
+   58:                        *    |_________ Unimplemented
+   59:                        */
+   60:      while (!ICGS1_ERCS)    /* Wait for external reference to be stable. */
+  0003 b600     [3]             LDA   _ICGS1
+  0005 a402     [2]             AND   #2
+  0007 27fa     [3]             BEQ   L3 ;abs = 0003
+   61:          ;
+   62:      ICGC2_LOLRE = 1;
+  0009 1e00     [5]             BSET  7,_ICGC2
+   63:      ICGC2_MFD = 0x00;       /* Mult factor of 4. */
+  000b b600     [3]             LDA   _ICGC2
+  000d a48f     [2]             AND   #-113
+  000f b700     [3]             STA   _ICGC2
+   64:  }
+  0011 81       [6]             RTS   
+   65:  
+   66:  
+   67:  /*!
+   68:    \fn void UseMcuClock()
+   69:    \brief	This function configures the use of the internal clock.
+   70:     Switch the MCU from MC13192 external to internal clock.
+   71:    \warning This function is executed if the core is a member of the
+   72:             HCS08G family 
+   73:  */
+   74:  void UseMcuClock() //use_mcu_clock()
+   75:  {
+   76:      ICGC1_RANGE = 1;        /* Range High. */
+  0000 1c00     [5]             BSET  6,_ICGC1
+   77:      ICGC1_OSCSTEN = 1;      /* Osc enabled in off mode. */
+  0002 1400     [5]             BSET  2,_ICGC1
+   78:      ICGC1_CLKS = 0x00;      /* Self clocked. */            
+  0004 b600     [3]             LDA   _ICGC1
+  0006 a4e7     [2]             AND   #-25
+  0008 b700     [3]             STA   _ICGC1
+   79:  }
+  000a 81       [6]             RTS   
+   80:  #endif
+   81:  
+   82:  
+   83:  /*
+   84:   * MC13192Restart: Restart the MC13192.
+   85:   *
+   86:   * Parameters: None
+   87:   *
+   88:   * Return : None
+   89:   */
+   90:  void MC13192Restart()
+   91:  {
+   92:  //UINT8 u8AttnIrq =0; //mod
+   93:  //UINT16 u8AttnIrq = 0; //mod
+   94:  
+   95:      gu8RTxMode = SYSTEM_RESET_MODE;
+  0000 a686     [2]             LDA   #-122
+  0002 c70000   [4]             STA   gu8RTxMode
+   96:      IRQInit();                  /* Turn on the IRQ pin. */
+  0005 6e1400   [4]             MOV   #20,_IRQSC
+   97:      MC13192_RESET = 1;          /* Take MC13192 out of reset */
+  0008 1600     [5]             BSET  3,_PTDD
+  000a          LA:     
+   98:      while (IRQSC_IRQF == 0)     /* Poll waiting for MC13192 to assert the irq */
+  000a b600     [3]             LDA   _IRQSC
+  000c a408     [2]             AND   #8
+  000e 27fa     [3]             BEQ   LA ;abs = 000a
+   99:          ; /* Empty Body */      /* (i.e. ATTN). */
+  100:      (void)SPIDrvRead(0x24);            /* Clear MC13192 interrupts */
+  0010 a624     [2]             LDA   #36
+  0012 cd0000   [6]             JSR   SPIDrvRead
+  101:      IRQACK();                   /* ACK the pending IRQ interrupt */
+  0015 1400     [5]             BSET  2,_IRQSC
+  102:      IRQPinEnable();             /* Pin Enable, IE, IRQ CLR, negative edge. */    
+  0017 6e1600   [4]             MOV   #22,_IRQSC
+  103:  }
+  001a 81       [6]             RTS   
+  104:  
+  105:  
+  106:  /*
+  107:   * MC13192ContReset: Reset (continuous) the MC13192.
+  108:   *
+  109:   * Parameters: None
+  110:   *
+  111:   * Return : None
+  112:   */
+  113:  void MC13192ContReset()
+  114:  {
+  115:      gu8RTxMode = SYSTEM_RESET_MODE;
+  0000 a686     [2]             LDA   #-122
+  0002 c70000   [4]             STA   gu8RTxMode
+  116:      IRQSC = 0x00;                   /* Set for negative edge. */
+  0005 3f00     [5]             CLR   _IRQSC
+  117:      MC13192_RESET = 0;              /* Place the MC13192 into reset */
+  0007 1700     [5]             BCLR  3,_PTDD
+  118:  }
+  0009 81       [6]             RTS   
+  119:  
+  120:  
+  121:  
+  122:  /*!
+  123:    \fn void GPIOInit()
+  124:    \brief Initialize the MCU-to-MC13192 GPIO direction and data.
+  125:  */
+  126:  void GPIOInit()
+  127:  {
+  128:      MC13192_RESET_PULLUP = 0;
+  0000 1700     [5]             BCLR  3,_PTDPE
+  129:      MC13192_CE = 1;                    
+  0002 1400     [5]             BSET  2,_PTED
+  130:      MC13192_ATTN = 1;
+  0004 1000     [5]             BSET  0,_PTDD
+  131:      MC13192_RTXEN = 0;
+  0006 1300     [5]             BCLR  1,_PTDD
+  132:      MC13192_RESET = 0;                  /* Do not initially reset MC13192 */
+  0008 1700     [5]             BCLR  3,_PTDD
+  133:      MC13192_CE_PORT = 1;
+  000a 1400     [5]             BSET  2,_PTEDD
+  134:      MC13192_ATTN_PORT = 1;
+  000c 1000     [5]             BSET  0,_PTDDD
+  135:      MC13192_RTXEN_PORT = 1;
+  000e 1200     [5]             BSET  1,_PTDDD
+  136:      MC13192_RESET_PORT = 1;
+  0010 1600     [5]             BSET  3,_PTDDD
+  137:      MC13192_CE = 1;                    
+  0012 1400     [5]             BSET  2,_PTED
+  138:      MC13192_ATTN = 1;
+  0014 1000     [5]             BSET  0,_PTDD
+  139:      MC13192_RTXEN = 0;
+  0016 1300     [5]             BCLR  1,_PTDD
+  140:      MC13192_RESET = 0;                  /* Do not initially reset MC13192 */
+  0018 1700     [5]             BCLR  3,_PTDD
+  141:   
+  142:      #if defined (ANTENNA_SWITCH)     
+  143:          MC13192_ANT_CTRL2_PORT = 1;        /* Output for antenna port RX */
+  144:          MC13192_ANT_CTRL_PORT = 1;        /* Output for antenna port TX */
+  145:          MC13192_ANT_CTRL2 = 1;          /* Signal to turn on RX antenna */
+  146:          MC13192_ANT_CTRL = 1;           /* Signal to turn on TX antenna */
+  147:      #endif
+  148:   
+  149:      #if defined (LNA)
+  150:          MC13192_LNA_CTRL = LNA_OFF;     /* Turn off the LNA out of reset */
+  151:          MC13192_LNA_CTRL_PORT  = 1;     /* Enable the port for OUTPUT */
+  152:      #endif
+  153:   
+  154:      #if defined (PA)
+  155:          MC13192_PA_CTRL = PA_OFF;       /* Turn off the PA out of Reset */
+  156:          MC13192_PA_CTRL_PORT = 1;       /* Enable the port for OUTPUT */
+  157:      #endif
+  158:   
+  159:  }
+  001a 81       [6]             RTS   
+  160:  
+  161:   /*!
+  162:    \fn void MCUInit() 
+  163:    \brief	Initialize the MCU COP, GPIO, SPI and IRQ.
+  164:     Set the desired MC13192 clock frequency here.
+  165:    \sa GPIOInit()
+  166:    \sa SPIInit()
+  167:    \sa IRQInit()
+  168:    \sa IRQACK()             
+  169:    \sa SPIDrvRead()
+  170:    \sa IRQPinEnable() 
+  171:  */
+  172:  
+  173:  void MCUInit(void)
+  174:  {
+  0000 a7fd     [2]             AIS   #-3
+  175:      UINT16 u16IrqReg =0;
+  176:      UINT8 u8AttnIrq = FALSE;
+  0002 9e6f03   [6]             CLR   3,SP
+  177:      UINT8 u8TimerHi, u8TimerLo;
+  178:      
+  179:      SOPT = 0x73;                /* Turn off the watchdog. */    
+  0005 a673     [2]             LDA   #115
+  0007 c70000   [4]             STA   _SOPT
+  180:      
+  181:      gu8RTxMode = RESET_DELAY;
+  000a a689     [2]             LDA   #-119
+  000c c70000   [4]             STA   gu8RTxMode
+  182:      
+  183:      /* Add a delay to debouce the reset switch on development boards ~200ms */
+  184:      TPM1SC = 0x0D;                /* 
+  000f 6e0d00   [4]             MOV   #13,_TPM1SC
+  0012          L12:    
+  185:                                   * Set the Timer module to use BUSCLK as 
+  186:                                   * reference with Prescaler at / 32 
+  187:                                   */    
+  188:      do {
+  189:          u8TimerHi = TPM1CNTH;   /* Get value of timer register (hi byte) */
+  0012 b600     [3]             LDA   _TPM1CNT
+  190:          u8TimerLo = TPM1CNTL;   /* Get value of timer register (lo byte) */
+  0014 b601     [3]             LDA   _TPM1CNT:1
+  191:      } while (u8TimerLo <= 0x80);/* 
+  0016 a180     [2]             CMP   #-128
+  0018 23f8     [3]             BLS   L12 ;abs = 0012
+  192:                                   * Poll for TIMER LO to be greater than 
+  193:                                   * 0x80 at 4MHz/32
+  194:                                   */    
+  195:      TPM1SC = 0x00;              /* Return to reset values */
+  001a 3f00     [5]             CLR   _TPM1SC
+  196:  
+  197:      gu8RTxMode = SYSTEM_RESET_MODE;
+  001c a686     [2]             LDA   #-122
+  001e c70000   [4]             STA   gu8RTxMode
+  198:      GPIOInit();
+  0021 ad00     [5]             BSR   GPIOInit
+  199:      SPIInit();
+  0023 cd0000   [6]             JSR   SPIInit
+  200:      IRQInit();                   /* Turn on the IRQ pin. */
+  0026 6e1400   [4]             MOV   #20,_IRQSC
+  201:      gu8RTxMode = MC13192_RESET_MODE;
+  0029 a687     [2]             LDA   #-121
+  002b c70000   [4]             STA   gu8RTxMode
+  202:      MC13192_RESET = 1;          /* Take MC13192 out of reset */
+  002e 1600     [5]             BSET  3,_PTDD
+  203:  
+  204:      while (u8AttnIrq == FALSE) {
+  0030 2026     [3]             BRA   L58 ;abs = 0058
+  0032          L32:    
+  205:      if (IRQFLAG == 1) {      /* Check to see if IRQ is asserted */
+  0032 b600     [3]             LDA   _IRQSC
+  0034 a408     [2]             AND   #8
+  0036 a108     [2]             CMP   #8
+  0038 261e     [3]             BNE   L58 ;abs = 0058
+  206:              u16IrqReg = SPIDrvRead(0x24);   /* 
+  003a a624     [2]             LDA   #36
+  003c cd0000   [6]             JSR   SPIDrvRead
+  003f 9eff01   [5]             STHX  1,SP
+  207:                                               * Clear MC13192 interrupts and  
+  208:                                               * check for ATTN IRQ from 13192
+  209:                                               */
+  210:              u16IrqReg &= 0x400;
+  0042 95       [2]             TSX   
+  0043 6f01     [5]             CLR   1,X
+  0045 f6       [3]             LDA   ,X
+  0046 a404     [2]             AND   #4
+  0048 f7       [2]             STA   ,X
+  211:              if (u16IrqReg == 0) {
+  0049 9efe01   [5]             LDHX  1,SP
+  004c 2605     [3]             BNE   L53 ;abs = 0053
+  212:                  u8AttnIrq = FALSE;
+  004e 9e6f03   [6]             CLR   3,SP
+  213:              }
+  0051 20df     [3]             BRA   L32 ;abs = 0032
+  0053          L53:    
+  214:              else {
+  215:                  u8AttnIrq = TRUE;
+  0053 a601     [2]             LDA   #1
+  0055 9ee703   [4]             STA   3,SP
+  0058          L58:    
+  0058 9e6d03   [5]             TST   3,SP
+  005b 27d5     [3]             BEQ   L32 ;abs = 0032
+  216:              }
+  217:          }
+  218:      }
+  219:   
+  220:  
+  221:      (void)PLMEPhyReset();        /* Reset the phy to its default settings */
+  005d cd0000   [6]             JSR   PLMEPhyReset
+  222:      IRQACK();              /* ACK the pending IRQ interrupt */
+  0060 1400     [5]             BSET  2,_IRQSC
+  223:      IRQPinEnable();        /* Pin Enable, IE, IRQ CLR, negative edge. */
+  0062 6e1600   [4]             MOV   #22,_IRQSC
+  224:      gu8RTxMode = MC13192_CONFIG_MODE;
+  0065 a688     [2]             LDA   #-120
+  0067 c70000   [4]             STA   gu8RTxMode
+  225:  }
+  006a a703     [2]             AIS   #3
+  006c 81       [6]             RTS   
+  226:  
+  227:   /*!
+  228:    \fn UINT8 IRQPinLow() 
+  229:    \brief	Checks IRQ Pin to see if is low.
+  230:    \return	1 if IRQ is Low   
+  231:     
+  232:  */
+  233:  UINT8 IRQPinLow(void){
+  234:  
+  235:      asm  BIL irq    
+  0000 2e03     [3]             BIL   L5 ;abs = 0005
+  236:      return 0;    
+  0002 4f       [1]             CLRA  
+  0003 2002     [3]             BRA   L7 ;abs = 0007
+  0005          L5:     
+  237:      asm irq:    
+  238:      return 1;
+  0005 a601     [2]             LDA   #1
+  0007          L7:     
+  239:  }
+  0007 81       [6]             RTS   
+  240:  
+  241:  #pragma INLINE
+  242:  void AssertCE(void){
+  243:    MC13192_CE = 0; /*!< Asserts the MC13192 CE pin */
+  0000 1500     [5]             BCLR  2,_PTED
+  244:  }
+  0002 81       [6]             RTS   
+  245:  #pragma INLINE
+  246:  void DeAssertCE(void){
+  247:    MC13192_CE = 1; /*!< Deasserts the MC13192 CE pin */
+  0000 1400     [5]             BSET  2,_PTED
+  248:  }
+  0002 81       [6]             RTS   
+  249:  #pragma INLINE
+  250:  void RTXENDeAssert(void){
+  251:    MC13192_RTXEN = 0; /*!< Deassert RTXEN */
+  0000 1300     [5]             BCLR  1,_PTDD
+  252:  }
+  0002 81       [6]             RTS   
+  253:  #pragma INLINE
+  254:  void RTXENAssert(void){
+  255:    MC13192_RTXEN = 1; /*!< Assert RTXEN */
+  0000 1200     [5]             BSET  1,_PTDD
+  256:  }
+  0002 81       [6]             RTS   
+  257:  #pragma INLINE
+  258:  void MC13192Wake(void){
+  259:    MC13192_ATTN = 0; /*!< Assert ATTN */ 
+  0000 1100     [5]             BCLR  0,_PTDD
+  260:    MC13192_ATTN = 1;  /*!< Deassert ATTN */
+  0002 1000     [5]             BSET  0,_PTDD
+  261:  }
+  0004 81       [6]             RTS   

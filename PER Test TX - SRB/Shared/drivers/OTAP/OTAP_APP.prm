@@ -1,0 +1,27 @@
+/* This is a linker parameter file for the GB60 */
+NAMES END /* CodeWarrior will pass all the needed files to the linker by command line. But here you may add your own files too. */
+
+SECTIONS /* here all RAM/ROM areas of the device are listed. Used in PLACEMENT below. */
+  Z_RAM  =            READ_WRITE  0x0080 TO 0x00FF; 
+  RAM_OTAP         =  READ_ONLY   0x9200 TO 0x93FF RELOCATE_TO 0x0100;
+  RAM    =            READ_WRITE  0x0300 TO 0x107F;
+  ROM2   =            READ_ONLY   0x1080 TO 0x13FF;
+  NVRAM	=             NO_INIT	    0x1400 TO 0x1800;	/* This keep out region protects 802.15.4 MAC NVRAM AREA */
+  ROM_ALT    =        READ_ONLY   0x182C TO 0x21FF;
+  OTAP_ROM_RESERVED = NO_INIT     0x2200 TO 0x91FF;
+  ROM    =            READ_ONLY   0x9400 TO 0xFEFF;  
+END
+
+PLACEMENT /* here all predefined and user segments are placed into the SECTIONS defined above. */
+  DEFAULT_ROM                   INTO ROM/*, ROM2*/; /* in case you want to use ROM2 here as well, add option -OnB=b to the compiler. */
+  DEFAULT_RAM                   INTO RAM;
+  _DATA_ZEROPAGE, MY_ZEROPAGE   INTO Z_RAM;
+  DOT4MAC_NVRAM					        INTO NVRAM;
+  FLASH_TO_RAM                  INTO RAM_OTAP;
+  OTAP_IMAGE                    INTO OTAP_ROM_RESERVED;
+END
+
+STACKSIZE 0x200
+
+
+VECTOR 0 _Startup 

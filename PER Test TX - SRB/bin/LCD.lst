@@ -1,0 +1,331 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /**
+    2:   * Copyright (c) 2004, Freescale Semiconductor
+    3:   * Freescale Confidential Proprietary
+    4:   *
+    5:   * File name :  LCD.c
+    6:   * Project name: SMAC (Simple Media Access Controller)
+    7:   *
+    8:   * Department : Freescale Radio Products Division
+    9:   *
+   10:   * Description : LCD functions
+   11:   *
+   12:   * $Author: rgd04c $
+   13:   * $Date: 2006/09/25 14:47:08 $
+   14:   * $Name:  $
+   15:   */
+   16:  /* File: LCD.c */
+   17:  
+   18:  
+   19:  
+   20:  #include "LCD.h"
+   21:  #include <string.h>
+   22:  #include "freescale_radio_hardware.h"
+   23:  
+   24:  #if (LCD_ENABLED)
+   25:  void LCDFirstLine( void )
+   26:  {
+   27:      /*  Setup the R/W for writing (PTGD), Initialize EN and RS to 0   */
+   28:  
+   29:      LCD_RW = 0;     
+   30:      LCD_REG_SEL = 0;     
+   31:   
+   32:  
+   33:      /* DD Ram Address Set - 1st Digit */
+   34:      LCDWrite4bits(0x80);
+   35:      LCDToggleEN();
+   36:      LCDWaitShort(1);
+   37:      LCDWrite4bits(0x00);
+   38:      LCDToggleEN();
+   39:      LCDWaitShort(4);
+   40:  }
+   41:  
+   42:  void LCDSecondLine(void)
+   43:  {
+   44:      /* Setup the R/W for writing (PTGD), Initialize EN and RS to 0  */    
+   45:  
+   46:      LCD_RW = 0;
+   47:      LCD_REG_SEL = 0;     
+   48:  
+   49:      /* DD Ram Address Set - 1st Digit */
+   50:      LCDWrite4bits(0xC0);
+   51:      LCDToggleEN();
+   52:      LCDWaitShort(1);
+   53:      LCDWrite4bits(0x00);
+   54:      LCDToggleEN();
+   55:      LCDWaitShort(4);
+   56:  }
+   57:  
+   58:  void LCDClearDisplay(void)
+   59:  {
+   60:      /* Setup the R/W for writing (PTGD), Initialize EN and RS to 0 */
+   61:      LCD_REG_SEL = 0;
+   62:      LCD_RW = 0; 
+   63:    
+   64:      LCDWrite4bits(0x00);
+   65:      LCDToggleEN();
+   66:      LCDWaitShort(1);
+   67:      LCDWrite4bits(0x10);
+   68:      LCDToggleEN();
+   69:      LCDWaitLong(3);
+   70:  }
+   71:  
+   72:  void LCDWaitLong(UINT16 w)
+   73:  {
+   74:      UINT16 x;
+   75:      UINT16 y;
+   76:        
+   77:      for ( y = 0; y < w; y++ )
+   78:      {
+   79:          for ( x = 0; x < 0x7FF; x++ );
+   80:      }
+   81:  }
+   82:  
+   83:  void LCDWaitShort(UINT8 w )
+   84:  {
+   85:      UINT8 x;
+   86:      UINT8 y;
+   87:        
+   88:      for ( y = 0; y < w; y++ )
+   89:      {
+   90:          for ( x = 0; x < 0xFF; x++ );
+   91:      }
+   92:  }
+   93:  
+   94:  void LCDToggleEN( void )
+   95:  {
+   96:  
+   97:  LCD_EN = 1;
+   98:  LCD_EN = 0; 
+   99:  
+  100:  }
+  101:  
+  102:  void LCDInit(void)
+  103:  {
+  104:      LCDWaitLong(5);
+  105:    
+  106:    
+  107:      LCD_INIT_MACRO;
+  108:      
+  109:    
+  110:      /* Initialize data port */
+  111:      
+  112:      LCD_DATA1 = 0;
+  113:      LCD_DATA2 = 0;
+  114:      LCD_DATA3 = 0;
+  115:      LCD_DATA4 = 0;// PTBD = PTBD & 0x0F;    
+  116:  
+  117:      /* Setup the R/W for writing (PTBD) */
+  118:      
+  119:      LCD_RW = 0; 
+  120:  
+  121:      /* Initialize EN and RS to 0 */
+  122:      
+  123:      LCD_REG_SEL = 0;
+  124:      LCD_EN = 0;
+  125:      
+  126:      /* Send the reset sequence */
+  127:      LCDWrite4bits(0x30);
+  128:      LCDToggleEN();
+  129:        
+  130:      LCDWaitLong(5);
+  131:    
+  132:      LCDWrite4bits(0x30);
+  133:      LCDToggleEN();
+  134:    
+  135:      LCDWaitShort(2);
+  136:    
+  137:      LCDWrite4bits(0x30);
+  138:      LCDToggleEN();
+  139:    
+  140:      LCDWaitShort(2);
+  141:  
+  142:      LCDWrite4bits(0x20);
+  143:      LCDToggleEN();
+  144:    
+  145:      LCDWaitShort(1);
+  146:    
+  147:      /* Function, 4 bit data length */
+  148:      LCDWrite4bits(0x20);
+  149:      LCDToggleEN();
+  150:    
+  151:      LCDWaitShort(1);
+  152:    
+  153:      /*  2 lines, 5x7 dot format  */
+  154:      LCDWrite4bits(0x80);
+  155:      LCDToggleEN();
+  156:    
+  157:      LCDWaitShort(4);
+  158:    
+  159:      // Entry Mode Inc, No Shift
+  160:      LCDWrite4bits(0x00);
+  161:      LCDToggleEN();
+  162:      LCDWaitShort(1);
+  163:      LCDWrite4bits(0x60);
+  164:      LCDToggleEN();
+  165:      LCDWaitShort(5);
+  166:    
+  167:      // Display ON/OFF Control - Display On, Cursor Off, Blink Off
+  168:      LCDWrite4bits(0x00);
+  169:      LCDToggleEN();
+  170:      LCDWaitShort(1);
+  171:      LCDWrite4bits(0xC0);
+  172:      LCDToggleEN();
+  173:      LCDWaitShort(5);
+  174:    
+  175:      // Display Clear
+  176:      LCDClearDisplay();
+  177:    
+  178:      //LCDFirstLine();
+  179:  }
+  180:  
+  181:  void LCDWrite4bits(UINT8 bdata)
+  182:  {
+  183:      if (bdata & 0x80)
+  184:      {
+  185:          LCD_DATA4 = 1;//PTBD = PTBD | bdata; 
+  186:      }
+  187:      else
+  188:      {
+  189:          LCD_DATA4 = 0;//PTBD = PTBD & 0x7F; 
+  190:      }
+  191:          
+  192:      if (bdata & 0x40)
+  193:      {
+  194:          LCD_DATA3 = 1;//PTBD = PTBD | bdata; 
+  195:      }
+  196:        else
+  197:      {
+  198:          LCD_DATA3 = 0;//PTBD = PTBD & 0xBF; 
+  199:      }
+  200:          
+  201:      if (bdata & 0x20)
+  202:      {
+  203:          LCD_DATA2 = 1;//PTBD = PTBD | bdata; 
+  204:      }
+  205:      else
+  206:      {
+  207:          LCD_DATA2 = 0;//PTBD = PTBD & 0xDF; 
+  208:  
+  209:      }
+  210:          
+  211:      if (bdata & 0x10)
+  212:      {
+  213:          LCD_DATA1 = 1;//PTBD = PTBD | bdata; 
+  214:      }
+  215:      else
+  216:      {
+  217:          LCD_DATA1 = 0;//PTBD = PTBD & 0xEF; 
+  218:      }
+  219:  }
+  220:  
+  221:  void LCDWriteCommand(UINT8 cmd)
+  222:  {
+  223:      
+  224:      LCD_RW = 0;
+  225:      LCD_REG_SEL = 0;
+  226:      LCD_EN = 0; 
+  227:  
+  228:      LCDWrite4bits(cmd);  /* cmd bits 4-7 */
+  229:    
+  230:      LCDToggleEN();
+  231:  
+  232:      LCDWrite4bits(cmd << 4);  /* cmd bits 0-3 */
+  233:      
+  234:      LCDToggleEN();
+  235:    
+  236:      LCDWaitLong(5);
+  237:  }
+  238:  
+  239:  
+  240:  void LCDWriteString(UINT8 line, UINT8 *str)
+  241:  {
+  242:      UINT8 len;
+  243:      UINT8 x;
+  244:    
+  245:      if (line == 2)
+  246:          LCDSecondLine();
+  247:      else
+  248:          LCDFirstLine();
+  249:    
+  250:      len = (UINT8)strlen(str);
+  251:  
+  252:      /* Check boundries  */
+  253:      if (len > MAX_LCD_CHARS)
+  254:          len = MAX_LCD_CHARS;
+  255:        
+  256:      for (x = 0; x < len; x++)
+  257:      {
+  258:          LCDWriteChar(str[x]);
+  259:      }
+  260:    
+  261:      /* Clear the rest of the line */
+  262:      for (; x < 16; x++)
+  263:      {
+  264:          LCDWriteChar(' ');
+  265:      }
+  266:  }
+  267:  
+  268:  void LCDWriteChar(UINT8 ch)
+  269:  {
+  270:      
+  271:      LCD_RW = 0;
+  272:      LCD_EN = 0;
+  273:      LCD_REG_SEL = 1;
+  274:        
+  275:      LCDWrite4bits(ch);
+  276:      
+  277:      LCDToggleEN();
+  278:        
+  279:      LCDWrite4bits(ch << 4);
+  280:        
+  281:      LCDToggleEN();
+  282:        
+  283:      LCDWaitShort(2);
+  284:  }
+  285:  
+  286:  #else
+  287:  void LCDInit(void)
+  288:  {
+  289:    
+  290:  }
+  0000 81       [6]             RTS   
+  291:  
+  292:  void LCDWrite4bits(UINT8 bdata)
+  293:  {
+  294:    (void) bdata;
+  295:  }
+  0000 81       [6]             RTS   
+  296:  
+  297:  void LCDFirstLine(void)
+  298:  {
+  299:    
+  300:  }
+  0000 81       [6]             RTS   
+  301:  
+  302:  void LCDSecondLine(void)
+  303:  {
+  304:    
+  305:  }
+  0000 81       [6]             RTS   
+  306:  
+  307:  void LCDClearDisplay(void)
+  308:  {
+  309:    
+  310:  }
+  0000 81       [6]             RTS   
+  311:  
+  312:  void LCDWriteString(UINT8 line, UINT8 *str)
+  313:  {
+  314:    (void) line;
+  315:    (void) str[0];
+  316:  }
+  0000 81       [6]             RTS   
+  317:  
+  318:  void LCDWriteChar(UINT8 ch)
+  319:  {
+  320:    (void) ch;
+  321:  }
+  0000 81       [6]             RTS   
+  322:  #endif

@@ -1,0 +1,140 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:   /*!
+    2:   * Copyright (c) 2005, Freescale Semiconductor
+    3:   *
+    4:   * Freescale Confidential Proprietary
+    5:   * \file    MC13192_hw_config.c
+    6:   * \brief   Here are the routines that are used by the MCU to initialize
+    7:   *          the MC13192.
+    8:   * \author  a19259
+    9:   * \version 4.1a
+   10:   * \date    2005/07/29 02:27:50 
+   11:   * 
+   12:   * \b Description:
+   13:   *
+   14:   * The main routine is the one that initializes the MC13192.There are
+   15:   * also included the Disable/Restore MC13192 interrupts commands.
+   16:   *
+   17:   * \b Department: Freescale Radio Products Division 
+   18:   *
+   19:   * \b Project: SMAC (Simple Media Access Controller)
+   20:   *
+   21:   * \b History:
+   22:   * - 16/11/2005 Doc. update to Doxygen compliant by Mario Rodriguez r12369c
+   23:   */ 
+   24:  
+   25:  #include "pub_def.h"
+   26:  #include "mcu_hw_config.h"
+   27:  #include "drivers.h"
+   28:  #include "MC13192_hw_config.h"
+   29:  
+   30:  /* Globals */
+   31:  extern UINT8 gu8RTxMode;		//!< Global mode mirror. 
+   32:  extern UINT8 gu8IRQValue;		//!< IRQ value. 
+   33:  
+   34:  /*!
+   35:   * \brief MC13192Init: Initialize the MC13192 register map.
+   36:   *
+   37:   */
+   38:  void MC13192Init(void)
+   39:  {
+   40:  
+   41:  /* Please refer to document MC13192RM for hidden register initialization */
+   42:      SPIDrvWrite(0x11,0x20FF);   /* Eliminate Unlock Conditions due to L01 */
+  0000 a611     [2]             LDA   #17
+  0002 4520ff   [3]             LDHX  #8447
+  0005 cd0000   [6]             JSR   SPIDrvWrite
+   43:      SPIDrvWrite(0x1B,0x8000);   /* Disable TC1. */
+  0008 a61b     [2]             LDA   #27
+  000a 458000   [3]             LDHX  #-32768
+  000d cd0000   [6]             JSR   SPIDrvWrite
+   44:      SPIDrvWrite(0x1D,0x8000);   /* Disable TC2. */
+  0010 5f       [1]             CLRX  
+  0011 a680     [2]             LDA   #-128
+  0013 87       [2]             PSHA  
+  0014 8a       [3]             PULH  
+  0015 a61d     [2]             LDA   #29
+  0017 cd0000   [6]             JSR   SPIDrvWrite
+   45:      SPIDrvWrite(0x1F,0x8000);   /* Disable TC3. */
+  001a 5f       [1]             CLRX  
+  001b a680     [2]             LDA   #-128
+  001d 87       [2]             PSHA  
+  001e 8a       [3]             PULH  
+  001f a61f     [2]             LDA   #31
+  0021 cd0000   [6]             JSR   SPIDrvWrite
+   46:      SPIDrvWrite(0x21,0x8000);   /* Disable TC4. */
+  0024 5f       [1]             CLRX  
+  0025 a680     [2]             LDA   #-128
+  0027 87       [2]             PSHA  
+  0028 8a       [3]             PULH  
+  0029 a621     [2]             LDA   #33
+  002b cd0000   [6]             JSR   SPIDrvWrite
+   47:      SPIDrvWrite(0x07,0x0E00);   /* Enable CLKo in Doze */
+  002e a607     [2]             LDA   #7
+  0030 450e00   [3]             LDHX  #3584
+  0033 cd0000   [6]             JSR   SPIDrvWrite
+   48:      SPIDrvWrite(0x0C,0x0300);   /* IRQ pull-up disable. */
+  0036 a60c     [2]             LDA   #12
+  0038 450300   [3]             LDHX  #768
+  003b cd0000   [6]             JSR   SPIDrvWrite
+   49:      (void)SPIDrvRead(0x25);           /* Sets the reset indicator bit */
+  003e a625     [2]             LDA   #37
+  0040 cd0000   [6]             JSR   SPIDrvRead
+   50:      SPIDrvWrite(0x04,0xA08D);   /* New cal value */
+  0043 a604     [2]             LDA   #4
+  0045 45a08d   [3]             LDHX  #-24435
+  0048 cd0000   [6]             JSR   SPIDrvWrite
+   51:      SPIDrvWrite(0x08,0xFFF7);   /* Preferred injection */
+  004b a608     [2]             LDA   #8
+  004d 45fff7   [3]             LDHX  #-9
+  0050 cd0000   [6]             JSR   SPIDrvWrite
+   52:      SPIDrvWrite(0x05,0x8351);   /* Acoma, TC1, Doze, ATTN masks, LO1, CRC */
+  0053 a605     [2]             LDA   #5
+  0055 458351   [3]             LDHX  #-31919
+  0058 cd0000   [6]             JSR   SPIDrvWrite
+   53:      SPIDrvWrite(0x06,0x4720);   /* CCA, TX, RX, energy detect */
+  005b a606     [2]             LDA   #6
+  005d 454720   [3]             LDHX  #18208
+  0060 cd0000   [6]             JSR   SPIDrvWrite
+   54:   
+   55:      /* Read the status register to clear any undesired IRQs. */
+   56:      (void)SPIDrvRead(0x24);           /* Clear the status register, if set */
+  0063 a624     [2]             LDA   #36
+  0065 cd0000   [6]             JSR   SPIDrvRead
+   57:      gu8RTxMode = IDLE_MODE;     /* Update global to reflect MC13192 status */
+  0068 4f       [1]             CLRA  
+  0069 c70000   [4]             STA   gu8RTxMode
+   58:  
+   59:  }
+  006c 81       [6]             RTS   
+   60:  
+   61:  
+   62:  /*!
+   63:   * \brief MC13192DisableInterrupts : Disable MC13192 interrupts
+   64:   *
+   65:   */
+   66:  void MC13192DisableInterrupts(void)
+   67:  {
+   68:      
+   69:      MC13192_IRQ_Disable();  /* Save context & disable the MC13192 interrupt source */
+  0000 b600     [3]             LDA   _IRQSC
+  0002 a4f9     [2]             AND   #-7
+  0004 b700     [3]             STA   _IRQSC
+   70:  }
+  0006 81       [6]             RTS   
+   71:  
+   72:  
+   73:  /*!
+   74:   * \brief MC13192RestoreInterrupts : Restore MC13192 interrupts to previous condition
+   75:   *
+   76:   */
+   77:  void MC13192RestoreInterrupts(void)
+   78:  {
+   79:      MC13192_IRQ_Enable();   /* Restore the context of the IRQ register from global */
+  0000 1200     [5]             BSET  1,_IRQSC
+   80:  }
+  0002 81       [6]             RTS   
+   81:  
+   82:  
+   83:  
