@@ -1,0 +1,117 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  #include "freescale_radio_hardware.h"
+    2:  #include "kbi.h"
+    3:  #include "eventDefs.h"
+    4:  
+    5:  extern UINT16 gu16Events;
+    6:  extern UINT16 gu16msTimer;
+    7:  extern UINT16 gu16timerEvent[2];
+    8:  
+    9:  interrupt void KBIisr (void) {
+  0000 8b       [2]             PSHH  
+   10:  
+   11:     UINT8 u8keys;
+   12:     
+   13:  
+   14:     u8keys = ~PTAD;
+  0001 b600     [3]             LDA   _PTAD
+  0003 43       [1]             COMA  
+   15:     
+   16:     /* Still in debounce time - just return */
+   17:     if (gu16timerEvent[1] != 0) {
+  0004 320002   [5]             LDHX  gu16timerEvent:2
+  0007 2652     [3]             BNE   L5B ;abs = 005b
+   18:        KBI1SC_KBACK = 1;
+   19:        return;
+   20:     }
+   21:        
+   22:     if ((u8keys & KBI_SW1) == KBI_SW1) {
+  0009 a504     [2]             BIT   #4
+  000b 2711     [3]             BEQ   L1E ;abs = 001e
+   23:        gu16timerEvent[1] = gu16msTimer + KBI_DEBOUNCE;
+  000d 320000   [5]             LDHX  gu16msTimer
+  0010 af14     [2]             AIX   #20
+  0012 960002   [5]             STHX  gu16timerEvent:2
+   24:        gu16Events |= KBI2_EVENT;
+  0015 87       [2]             PSHA  
+  0016 450001   [3]             LDHX  @gu16Events:1
+  0019 f6       [3]             LDA   ,X
+  001a aa10     [2]             ORA   #16
+  001c f7       [2]             STA   ,X
+  001d 86       [3]             PULA  
+  001e          L1E:    
+   25:     }
+   26:     
+   27:     if ((u8keys & KBI_SW2) == KBI_SW2) {
+  001e a508     [2]             BIT   #8
+  0020 2711     [3]             BEQ   L33 ;abs = 0033
+   28:        gu16timerEvent[1] = gu16msTimer + KBI_DEBOUNCE;    
+  0022 320000   [5]             LDHX  gu16msTimer
+  0025 af14     [2]             AIX   #20
+  0027 960002   [5]             STHX  gu16timerEvent:2
+   29:  	   gu16Events |= KBI3_EVENT;
+  002a 87       [2]             PSHA  
+  002b 450001   [3]             LDHX  @gu16Events:1
+  002e f6       [3]             LDA   ,X
+  002f aa20     [2]             ORA   #32
+  0031 f7       [2]             STA   ,X
+  0032 86       [3]             PULA  
+  0033          L33:    
+   30:     }
+   31:     
+   32:     if ((u8keys & KBI_SW3) == KBI_SW3) {
+  0033 a510     [2]             BIT   #16
+  0035 2711     [3]             BEQ   L48 ;abs = 0048
+   33:        gu16timerEvent[1] = gu16msTimer + KBI_DEBOUNCE;
+  0037 320000   [5]             LDHX  gu16msTimer
+  003a af14     [2]             AIX   #20
+  003c 960002   [5]             STHX  gu16timerEvent:2
+   34:        gu16Events |= KBI4_EVENT;
+  003f 87       [2]             PSHA  
+  0040 450001   [3]             LDHX  @gu16Events:1
+  0043 f6       [3]             LDA   ,X
+  0044 aa40     [2]             ORA   #64
+  0046 f7       [2]             STA   ,X
+  0047 86       [3]             PULA  
+  0048          L48:    
+   35:     }
+   36:     
+   37:     if ((u8keys & KBI_SW4) == KBI_SW4) {
+  0048 a520     [2]             BIT   #32
+  004a 270f     [3]             BEQ   L5B ;abs = 005b
+   38:        gu16timerEvent[1] = gu16msTimer + KBI_DEBOUNCE;    
+  004c 320000   [5]             LDHX  gu16msTimer
+  004f af14     [2]             AIX   #20
+  0051 960002   [5]             STHX  gu16timerEvent:2
+   39:  	   gu16Events |= KBI5_EVENT;
+  0054 450001   [3]             LDHX  @gu16Events:1
+  0057 f6       [3]             LDA   ,X
+  0058 aa80     [2]             ORA   #-128
+  005a f7       [2]             STA   ,X
+  005b          L5B:    
+   40:     }
+   41:     
+   42:     KBI1SC_KBACK = 1; 
+  005b 1400     [5]             BSET  2,_KBI1SC
+   43:     
+   44:  }
+  005d 8a       [3]             PULH  
+  005e 80       [9]             RTI   
+   45:  void KBIInit(void) {
+   46:  
+   47:       PB0IE = 1;  /* Enable KBI PB0 */
+  0000 1400     [5]             BSET  2,_KBI1PE
+   48:       PB1IE = 1;
+  0002 1600     [5]             BSET  3,_KBI1PE
+   49:       PB2IE = 1;
+  0004 1800     [5]             BSET  4,_KBI1PE
+   50:       PB3IE = 1;
+  0006 1a00     [5]             BSET  5,_KBI1PE
+   51:       
+   52:             
+   53:       
+   54:  }
+  0008 81       [6]             RTS   
+   55:  
+   56:  

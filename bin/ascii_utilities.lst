@@ -1,0 +1,600 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  #include "pub_def.h"
+    2:  #include "ascii_utilities.h"
+    3:  #include "string.h"
+    4:  
+    5:  void int2string (UINT32 value, char *string) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+    6:  
+    7:  	UINT8 remainder;
+    8:  	UINT8 offset = 9;
+    9:  	
+   10:  	(void)strcpy(string, "          ");
+  0002 89       [2]             PSHX  
+  0003 8b       [2]             PSHH  
+  0004 450000   [3]             LDHX  @"          "
+  0007 cd0000   [6]             JSR   strcpy
+  000a a702     [2]             AIS   #2
+  000c a609     [2]             LDA   #9
+  000e          LE:     
+   11:  	
+   12:  	do {
+   13:  		remainder = value % 10;
+  000e 95       [2]             TSX   
+  000f af04     [2]             AIX   #4
+  0011 cd0000   [6]             JSR   _LMODU_RC
+  0014 0000000a         DC.L  10
+   14:  		string[offset] = UTILDec2Char(remainder);
+  0018 87       [2]             PSHA  
+  0019 95       [2]             TSX   
+  001a eb06     [3]             ADD   6,X
+  001c 87       [2]             PSHA  
+  001d 4f       [1]             CLRA  
+  001e e905     [3]             ADC   5,X
+  0020 87       [2]             PSHA  
+  0021 e604     [3]             LDA   4,X
+  0023 cd0000   [6]             JSR   UTILDec2Char
+  0026 8a       [3]             PULH  
+  0027 88       [3]             PULX  
+  0028 f7       [2]             STA   ,X
+   15:  		value = value / 10;
+  0029 95       [2]             TSX   
+  002a af09     [2]             AIX   #9
+  002c cd0000   [6]             JSR   _LDIVU_RC
+  002f 0000000a         DC.L  10
+  0033 cd0000   [6]             JSR   _POP32
+   16:  		offset--;
+  0036 86       [3]             PULA  
+  0037 4a       [1]             DECA  
+   17:  	} 
+   18:  	while (value != 0);
+  0038 87       [2]             PSHA  
+  0039 95       [2]             TSX   
+  003a e60c     [3]             LDA   12,X
+  003c ea0b     [3]             ORA   11,X
+  003e ea0a     [3]             ORA   10,X
+  0040 ea09     [3]             ORA   9,X
+  0042 cd0000   [6]             JSR   _PUSH_CC
+  0045 f6       [3]             LDA   ,X
+  0046 cd0000   [6]             JSR   _POP_CC
+  0049 a705     [2]             AIS   #5
+  004b 26c1     [3]             BNE   LE ;abs = 000e
+   19:  
+   20:  	string[10] = 0;		//Set to null.
+  004d 9efe01   [5]             LDHX  1,SP
+  0050 6f0a     [5]             CLR   10,X
+   21:  
+   22:  }
+  0052 a702     [2]             AIS   #2
+  0054 81       [6]             RTS   
+   23:  
+   24:  char UTILDec2Char(UINT8 value) {
+   25:  
+   26:  	if (value <=9) // ((value >= 0) && (value <=9))
+  0000 a109     [2]             CMP   #9
+  0002 2204     [3]             BHI   L8 ;abs = 0008
+   27:  		return (char) (value + 0x30);
+  0004 ab30     [2]             ADD   #48
+  0006 2002     [3]             BRA   LA ;abs = 000a
+  0008          L8:     
+   28:  	else
+   29:  		return (char) (value + 0x37);
+  0008 ab37     [2]             ADD   #55
+  000a          LA:     
+   30:  }
+  000a 81       [6]             RTS   
+   31:  
+   32:  UINT8 char2num(char ch) {
+   33:  
+   34:     UINT8 value=0;
+   35:  
+   36:     if ((ch >= '0') && (ch <='9')) {
+  0000 a030     [2]             SUB   #48
+  0002 97       [1]             TAX   
+  0003 4f       [1]             CLRA  
+  0004 a309     [2]             CPX   #9
+  0006 2201     [3]             BHI   L9_1 ;abs = 0009
+   37:        value = ch - 0x30;
+   38:     } else {
+  0008 9f       [1]             TXA   
+  0009          L9:     
+  0009          L9_1:   
+   39:        value = 0;
+   40:     }
+   41:     
+   42:     return value;
+   43:  }
+  0009 81       [6]             RTS   
+   44:  
+   45:  UINT32 String2Uint32(char *str) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7f5     [2]             AIS   #-11
+   46:     
+   47:     UINT8 u8i, u8length;
+   48:     UINT32 u32value=0;
+  0004 5f       [1]             CLRX  
+  0005 8c       [1]             CLRH  
+  0006 9eff07   [5]             STHX  7,SP
+  0009 8c       [1]             CLRH  
+  000a 9eff05   [5]             STHX  5,SP
+   49:     UINT32 u32total=0;
+  000d 8c       [1]             CLRH  
+  000e 9eff03   [5]             STHX  3,SP
+  0011 8c       [1]             CLRH  
+  0012 9eff01   [5]             STHX  1,SP
+   50:     UINT16 u16base=1;
+  0015 5c       [1]             INCX  
+  0016 9eff0a   [5]             STHX  10,SP
+   51:     
+   52:     //Check for Null String
+   53:     u8length = (UINT8) strlen(str);
+  0019 9efe0c   [5]             LDHX  12,SP
+  001c cd0000   [6]             JSR   strlen
+  001f 9eef09   [4]             STX   9,SP
+   54:     if (u8length == 0) {
+  0022 260d     [3]             BNE   L31 ;abs = 0031
+   55:        return 0;
+  0024 9efe10   [5]             LDHX  16,SP
+  0027 7f       [4]             CLR   ,X
+  0028 6f01     [5]             CLR   1,X
+  002a 6f02     [5]             CLR   2,X
+  002c 6f03     [5]             CLR   3,X
+  002e cc00d4   [4]             JMP   LD4 ;abs = 00d4
+  0031          L31:    
+   56:     }
+   57:     
+   58:     //Check for Overflow of the UINT32 variable.
+   59:     if (u8length > 8) {
+  0031 a308     [2]             CPX   #8
+  0033 230d     [3]             BLS   L42 ;abs = 0042
+   60:        return 0xFFFFFFFF;
+  0035 9efe10   [5]             LDHX  16,SP
+  0038 a6ff     [2]             LDA   #-1
+  003a f7       [2]             STA   ,X
+  003b e701     [3]             STA   1,X
+  003d e702     [3]             STA   2,X
+  003f cc00d2   [4]             JMP   LD2 ;abs = 00d2
+  0042          L42:    
+   61:     }
+   62:     
+   63:     for (u8i=0; u8i<u8length; u8i++) {
+  0042 4f       [1]             CLRA  
+  0043 2074     [3]             BRA   LB9 ;abs = 00b9
+  0045          L45:    
+   64:       u32value = char2num((char) str[u8length-u8i-1]);
+  0045 87       [2]             PSHA  
+  0046 95       [2]             TSX   
+  0047 e609     [3]             LDA   9,X
+  0049 f0       [3]             SUB   ,X
+  004a 87       [2]             PSHA  
+  004b 4f       [1]             CLRA  
+  004c a200     [2]             SBC   #0
+  004e 87       [2]             PSHA  
+  004f 8a       [3]             PULH  
+  0050 88       [3]             PULX  
+  0051 afff     [2]             AIX   #-1
+  0053 9f       [1]             TXA   
+  0054 9eeb0e   [4]             ADD   14,SP
+  0057 87       [2]             PSHA  
+  0058 8b       [2]             PSHH  
+  0059 86       [3]             PULA  
+  005a 9ee90e   [4]             ADC   14,SP
+  005d 87       [2]             PSHA  
+  005e 8a       [3]             PULH  
+  005f 88       [3]             PULX  
+  0060 f6       [3]             LDA   ,X
+  0061 ad00     [5]             BSR   char2num
+  0063 8c       [1]             CLRH  
+  0064 97       [1]             TAX   
+  0065 9eff08   [5]             STHX  8,SP
+  0068 4f       [1]             CLRA  
+  0069 5f       [1]             CLRX  
+  006a 9eff06   [5]             STHX  6,SP
+   65:       u32value *= u16base;
+  006d 9efe0b   [5]             LDHX  11,SP
+  0070 89       [2]             PSHX  
+  0071 8b       [2]             PSHH  
+  0072 87       [2]             PSHA  
+  0073 87       [2]             PSHA  
+  0074 95       [2]             TSX   
+  0075 89       [2]             PSHX  
+  0076 8b       [2]             PSHH  
+  0077 af09     [2]             AIX   #9
+  0079 89       [2]             PSHX  
+  007a 8b       [2]             PSHH  
+  007b 9efe03   [5]             LDHX  3,SP
+  007e cd0000   [6]             JSR   _LMUL
+  0081 95       [2]             TSX   
+  0082 af0f     [2]             AIX   #15
+  0084 cd0000   [6]             JSR   _POP32
+   66:       u16base *= 10;
+  0087 ae0a     [2]             LDX   #10
+  0089 8c       [1]             CLRH  
+  008a 89       [2]             PSHX  
+  008b 8b       [2]             PSHH  
+  008c 95       [2]             TSX   
+  008d e606     [3]             LDA   6,X
+  008f 87       [2]             PSHA  
+  0090 ee07     [3]             LDX   7,X
+  0092 8a       [3]             PULH  
+  0093 cd0000   [6]             JSR   _IMUL_STAR08
+  0096 a702     [2]             AIS   #2
+  0098 9eff11   [5]             STHX  17,SP
+   67:       u32total += u32value;
+  009b 95       [2]             TSX   
+  009c e60e     [3]             LDA   14,X
+  009e eb0a     [3]             ADD   10,X
+  00a0 e70a     [3]             STA   10,X
+  00a2 e609     [3]             LDA   9,X
+  00a4 e90d     [3]             ADC   13,X
+  00a6 e709     [3]             STA   9,X
+  00a8 e608     [3]             LDA   8,X
+  00aa e90c     [3]             ADC   12,X
+  00ac e708     [3]             STA   8,X
+  00ae e60b     [3]             LDA   11,X
+  00b0 e907     [3]             ADC   7,X
+  00b2 e707     [3]             STA   7,X
+  00b4 e606     [3]             LDA   6,X
+  00b6 4c       [1]             INCA  
+  00b7 a707     [2]             AIS   #7
+  00b9          LB9:    
+  00b9 9ee109   [4]             CMP   9,SP
+  00bc 2587     [3]             BCS   L45 ;abs = 0045
+   68:     }
+   69:     
+   70:     return u32total;
+  00be 9efe10   [5]             LDHX  16,SP
+  00c1 9ee601   [4]             LDA   1,SP
+  00c4 f7       [2]             STA   ,X
+  00c5 9ee602   [4]             LDA   2,SP
+  00c8 e701     [3]             STA   1,X
+  00ca 9ee603   [4]             LDA   3,SP
+  00cd e702     [3]             STA   2,X
+  00cf 9ee604   [4]             LDA   4,SP
+  00d2          LD2:    
+  00d2 e703     [3]             STA   3,X
+  00d4          LD4:    
+   71:  }
+  00d4 a70d     [2]             AIS   #13
+  00d6 81       [6]             RTS   
+   72:  
+   73:  UINT16 String2Uint16(char *str) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7f7     [2]             AIS   #-9
+   74:     
+   75:     UINT8 u8i, u8length;
+   76:     UINT32 u32value=0;
+  0004 5f       [1]             CLRX  
+  0005 8c       [1]             CLRH  
+  0006 9eff03   [5]             STHX  3,SP
+  0009 9eff01   [5]             STHX  1,SP
+   77:     UINT16 u16total=0;
+  000c 9e6f06   [6]             CLR   6,SP
+  000f 9e6f05   [6]             CLR   5,SP
+   78:     UINT16 u16base=1;
+  0012 5c       [1]             INCX  
+  0013 9eff08   [5]             STHX  8,SP
+   79:     
+   80:     //Check for Null String
+   81:     u8length = (UINT8)strlen(str);
+  0016 9efe0a   [5]             LDHX  10,SP
+  0019 cd0000   [6]             JSR   strlen
+  001c 9eef07   [4]             STX   7,SP
+   82:     if (u8length == 0) {
+  001f 2604     [3]             BNE   L25 ;abs = 0025
+   83:        return 0;
+  0021 8c       [1]             CLRH  
+  0022 5f       [1]             CLRX  
+  0023 207d     [3]             BRA   LA2 ;abs = 00a2
+  0025          L25:    
+   84:     }
+   85:     
+   86:     //Check for Overflow of the UINT32 variable.
+   87:     if (u8length > 8) {
+  0025 a308     [2]             CPX   #8
+  0027 2305     [3]             BLS   L2E ;abs = 002e
+   88:        return 0xFFFFFFFF;
+  0029 45ffff   [3]             LDHX  #-1
+  002c 2074     [3]             BRA   LA2 ;abs = 00a2
+  002e          L2E:    
+   89:     }
+   90:     
+   91:     for (u8i=0; u8i<u8length; u8i++) {
+  002e 4f       [1]             CLRA  
+  002f 2069     [3]             BRA   L9A ;abs = 009a
+  0031          L31:    
+   92:       u32value = char2num((char) str[u8length-u8i-1]);
+  0031 87       [2]             PSHA  
+  0032 95       [2]             TSX   
+  0033 e607     [3]             LDA   7,X
+  0035 f0       [3]             SUB   ,X
+  0036 87       [2]             PSHA  
+  0037 4f       [1]             CLRA  
+  0038 a200     [2]             SBC   #0
+  003a 87       [2]             PSHA  
+  003b 8a       [3]             PULH  
+  003c 88       [3]             PULX  
+  003d afff     [2]             AIX   #-1
+  003f 9f       [1]             TXA   
+  0040 9eeb0c   [4]             ADD   12,SP
+  0043 87       [2]             PSHA  
+  0044 8b       [2]             PSHH  
+  0045 86       [3]             PULA  
+  0046 9ee90c   [4]             ADC   12,SP
+  0049 87       [2]             PSHA  
+  004a 8a       [3]             PULH  
+  004b 88       [3]             PULX  
+  004c f6       [3]             LDA   ,X
+  004d cd0000   [6]             JSR   char2num
+  0050 8c       [1]             CLRH  
+  0051 97       [1]             TAX   
+  0052 9eff04   [5]             STHX  4,SP
+  0055 4f       [1]             CLRA  
+  0056 5f       [1]             CLRX  
+  0057 9eff02   [5]             STHX  2,SP
+   93:       u32value *= u16base;
+  005a 9efe09   [5]             LDHX  9,SP
+  005d 89       [2]             PSHX  
+  005e 8b       [2]             PSHH  
+  005f 87       [2]             PSHA  
+  0060 87       [2]             PSHA  
+  0061 95       [2]             TSX   
+  0062 89       [2]             PSHX  
+  0063 8b       [2]             PSHH  
+  0064 af05     [2]             AIX   #5
+  0066 89       [2]             PSHX  
+  0067 8b       [2]             PSHH  
+  0068 9efe03   [5]             LDHX  3,SP
+  006b cd0000   [6]             JSR   _LMUL
+  006e 95       [2]             TSX   
+  006f af0b     [2]             AIX   #11
+  0071 cd0000   [6]             JSR   _POP32
+   94:       u16base *= 10;
+  0074 ae0a     [2]             LDX   #10
+  0076 8c       [1]             CLRH  
+  0077 89       [2]             PSHX  
+  0078 8b       [2]             PSHH  
+  0079 95       [2]             TSX   
+  007a e606     [3]             LDA   6,X
+  007c 87       [2]             PSHA  
+  007d ee07     [3]             LDX   7,X
+  007f 8a       [3]             PULH  
+  0080 cd0000   [6]             JSR   _IMUL_STAR08
+  0083 a702     [2]             AIS   #2
+  0085 9eff0f   [5]             STHX  15,SP
+   95:       u16total += (UINT16)u32value;
+  0088 95       [2]             TSX   
+  0089 e60c     [3]             LDA   12,X
+  008b eb0a     [3]             ADD   10,X
+  008d e70c     [3]             STA   12,X
+  008f e609     [3]             LDA   9,X
+  0091 e90b     [3]             ADC   11,X
+  0093 e70b     [3]             STA   11,X
+  0095 e606     [3]             LDA   6,X
+  0097 4c       [1]             INCA  
+  0098 a707     [2]             AIS   #7
+  009a          L9A:    
+  009a 9ee107   [4]             CMP   7,SP
+  009d 2592     [3]             BCS   L31 ;abs = 0031
+   96:     }
+   97:     
+   98:     return u16total;
+  009f 9efe05   [5]             LDHX  5,SP
+  00a2          LA2:    
+   99:  }
+  00a2 a70b     [2]             AIS   #11
+  00a4 81       [6]             RTS   
+  100:  
+  101:  void UTILInt2String (UINT32 value, UINT8 *string) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  102:  
+  103:      UINT8 remainder;
+  104:      UINT8 offset = 9;
+  105:      
+  106:      (void)strcpy(string, "          ");
+  0002 89       [2]             PSHX  
+  0003 8b       [2]             PSHH  
+  0004 450000   [3]             LDHX  @"          "
+  0007 cd0000   [6]             JSR   strcpy
+  000a a702     [2]             AIS   #2
+  000c a609     [2]             LDA   #9
+  000e          LE:     
+  107:      
+  108:      do {
+  109:          remainder = value % 10;
+  000e 95       [2]             TSX   
+  000f af04     [2]             AIX   #4
+  0011 cd0000   [6]             JSR   _LMODU_RC
+  0014 0000000a         DC.L  10
+  110:          string[offset] = UTILDec2Char(remainder);
+  0018 87       [2]             PSHA  
+  0019 95       [2]             TSX   
+  001a eb06     [3]             ADD   6,X
+  001c 87       [2]             PSHA  
+  001d 4f       [1]             CLRA  
+  001e e905     [3]             ADC   5,X
+  0020 87       [2]             PSHA  
+  0021 e604     [3]             LDA   4,X
+  0023 cd0000   [6]             JSR   UTILDec2Char
+  0026 8a       [3]             PULH  
+  0027 88       [3]             PULX  
+  0028 f7       [2]             STA   ,X
+  111:          value = value / 10;
+  0029 95       [2]             TSX   
+  002a af09     [2]             AIX   #9
+  002c cd0000   [6]             JSR   _LDIVU_RC
+  002f 0000000a         DC.L  10
+  0033 cd0000   [6]             JSR   _POP32
+  112:          offset--;
+  0036 86       [3]             PULA  
+  0037 4a       [1]             DECA  
+  113:      } 
+  114:      while (value != 0);
+  0038 87       [2]             PSHA  
+  0039 95       [2]             TSX   
+  003a e60c     [3]             LDA   12,X
+  003c ea0b     [3]             ORA   11,X
+  003e ea0a     [3]             ORA   10,X
+  0040 ea09     [3]             ORA   9,X
+  0042 cd0000   [6]             JSR   _PUSH_CC
+  0045 f6       [3]             LDA   ,X
+  0046 cd0000   [6]             JSR   _POP_CC
+  0049 a705     [2]             AIS   #5
+  004b 26c1     [3]             BNE   LE ;abs = 000e
+  115:  
+  116:      string[10] = 0;        //Set to null.
+  004d 9efe01   [5]             LDHX  1,SP
+  0050 6f0a     [5]             CLR   10,X
+  117:  
+  118:  }
+  0052 a702     [2]             AIS   #2
+  0054 81       [6]             RTS   
+  119:  
+  120:  void Uint32ToHexString(UINT32 u32Num, UINT8 *pu8Str) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 8b       [2]             PSHH  
+  121:  
+  122:  	UINT8 u8Mod = 0;
+  123:  	UINT8 u8Offset = 9;
+  0003 a609     [2]             LDA   #9
+  124:  	
+  125:  	(void)strcpy(pu8Str, "00000000000");
+  0005 89       [2]             PSHX  
+  0006 8b       [2]             PSHH  
+  0007 9ee703   [4]             STA   3,SP
+  000a 450000   [3]             LDHX  @"00000000000"
+  000d cd0000   [6]             JSR   strcpy
+  0010 a702     [2]             AIS   #2
+  126:  	
+  127:  	while(u32Num != 0){
+  0012 2028     [3]             BRA   L3C ;abs = 003c
+  0014          L14:    
+  128:  	  u8Mod = u32Num % 16;
+  0014 e608     [3]             LDA   8,X
+  0016 a40f     [2]             AND   #15
+  129:  	  pu8Str[u8Offset] = UTILDec2Char(u8Mod);
+  0018 87       [2]             PSHA  
+  0019 f6       [3]             LDA   ,X
+  001a eb02     [3]             ADD   2,X
+  001c 87       [2]             PSHA  
+  001d 4f       [1]             CLRA  
+  001e e901     [3]             ADC   1,X
+  0020 87       [2]             PSHA  
+  0021 9ee603   [4]             LDA   3,SP
+  0024 cd0000   [6]             JSR   UTILDec2Char
+  0027 8a       [3]             PULH  
+  0028 88       [3]             PULX  
+  0029 f7       [2]             STA   ,X
+  130:  	  u32Num/=16;
+  002a 95       [2]             TSX   
+  002b af06     [2]             AIX   #6
+  002d a604     [2]             LDA   #4
+  002f          L2F:    
+  002f 74       [4]             LSR   ,X
+  0030 6601     [5]             ROR   1,X
+  0032 6602     [5]             ROR   2,X
+  0034 6603     [5]             ROR   3,X
+  0036 4bf7     [4]             DBNZA L2F ;abs = 002f
+  131:  	  u8Offset--;
+  0038 9e6a02   [6]             DEC   2,SP
+  003b 8a       [3]             PULH  
+  003c          L3C:    
+  003c 95       [2]             TSX   
+  003d e608     [3]             LDA   8,X
+  003f ea07     [3]             ORA   7,X
+  0041 ea06     [3]             ORA   6,X
+  0043 ea05     [3]             ORA   5,X
+  0045 26cd     [3]             BNE   L14 ;abs = 0014
+  132:  	}
+  133:  	pu8Str[0] = '0';
+  0047 9efe02   [5]             LDHX  2,SP
+  004a a630     [2]             LDA   #48
+  004c f7       [2]             STA   ,X
+  134:  	pu8Str[1] = 'x';
+  004d a678     [2]             LDA   #120
+  004f e701     [3]             STA   1,X
+  135:  	pu8Str[10] = '\0';
+  0051 6f0a     [5]             CLR   10,X
+  136:  	 
+  137:  }
+  0053 a703     [2]             AIS   #3
+  0055 81       [6]             RTS   
+  138:  
+  139:  void trimWhiteSpace(char *str) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7fd     [2]             AIS   #-3
+  140:     
+  141:     UINT8 length, i=0;
+  142:     UINT8 leading_ws=0;
+  143:     UINT8 ws_flag = TRUE;
+  0004 a601     [2]             LDA   #1
+  0006 9ee702   [4]             STA   2,SP
+  144:     
+  145:     length = (UINT8) strlen(str);
+  0009 cd0000   [6]             JSR   strlen
+  000c 9eef03   [4]             STX   3,SP
+  146:     
+  147:  
+  148:        while ((i < length) && (ws_flag == TRUE)) {
+  000f 4f       [1]             CLRA  
+  0010 201b     [3]             BRA   L2D ;abs = 002d
+  0012          L12:    
+  149:           if (str[i] >= 33 && str[i] <=126) {
+  0012 95       [2]             TSX   
+  0013 f7       [2]             STA   ,X
+  0014 eb04     [3]             ADD   4,X
+  0016 87       [2]             PSHA  
+  0017 4f       [1]             CLRA  
+  0018 e903     [3]             ADC   3,X
+  001a 87       [2]             PSHA  
+  001b 8a       [3]             PULH  
+  001c 88       [3]             PULX  
+  001d f6       [3]             LDA   ,X
+  001e a021     [2]             SUB   #33
+  0020 a15d     [2]             CMP   #93
+  0022 2206     [3]             BHI   L2A ;abs = 002a
+  150:              ws_flag = FALSE;
+  0024 95       [2]             TSX   
+  0025 6f01     [5]             CLR   1,X
+  151:           } else {
+  0027 f6       [3]             LDA   ,X
+  0028 2003     [3]             BRA   L2D ;abs = 002d
+  002a          L2A:    
+  152:              i++;
+  002a 95       [2]             TSX   
+  002b f6       [3]             LDA   ,X
+  002c 4c       [1]             INCA  
+  002d          L2D:    
+  002d 9ee103   [4]             CMP   3,SP
+  0030 2406     [3]             BCC   L38 ;abs = 0038
+  0032 9eee02   [4]             LDX   2,SP
+  0035 5101da   [4]             CBEQX #1,L12 ;abs = 0012
+  0038          L38:    
+  153:           }
+  154:        }
+  155:        
+  156:        leading_ws = i;
+  157:        (void)strcpy(str, str + leading_ws);   
+  0038 9efe04   [5]             LDHX  4,SP
+  003b 89       [2]             PSHX  
+  003c 8b       [2]             PSHH  
+  003d 95       [2]             TSX   
+  003e eb06     [3]             ADD   6,X
+  0040 e702     [3]             STA   2,X
+  0042 4f       [1]             CLRA  
+  0043 e905     [3]             ADC   5,X
+  0045 ee02     [3]             LDX   2,X
+  0047 87       [2]             PSHA  
+  0048 8a       [3]             PULH  
+  0049 cd0000   [6]             JSR   strcpy
+  158:  }
+  004c a707     [2]             AIS   #7
+  004e 81       [6]             RTS   
+  159:  

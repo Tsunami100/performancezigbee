@@ -1,0 +1,165 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /*!
+    2:   * Copyright (c) 2005, Freescale Semiconductor
+    3:   *
+    4:   * Freescale Confidential Proprietary
+    5:   * \file    mcu_spi_config.c
+    6:   * \brief   This is the SMAC C source for the SPI driver
+    7:   * \author  Larry Roshak
+    8:   * \version 4.1a
+    9:   * \date    2005/08/11 20:44:37 
+   10:   * 
+   11:   * \b Description:
+   12:   *
+   13:   * This is the SMAC C source driver file for the 
+   14:   * The driver control interface to the SPI.
+   15:   *
+   16:   * \b Department: Freescale Radio Products Division 
+   17:   *
+   18:   * \b Project: SMAC (Simple Media Access Controller)
+   19:   *
+   20:   * \b History:
+   21:   * - 17/04/2004 : Initial Development. (FLR005)
+   22:   * - 07/01/2005 : Code Standarization. (A19259)
+   23:   * - 11/16/2005 Doc. update to Doxygen compliant by Gonzalo Delgado 
+   24:   * Huitron rgd04c
+   25:   */ 
+   26:  
+   27:  #include "pub_def.h"
+   28:  #include "mcu_hw_config.h"
+   29:  #include "derivative.h"
+   30:  #include "drivers.h"
+   31:  #include "MC13192_hw_config.h"
+   32:  #include "MC13192_regs.h"
+   33:  #include "mcu_spi_config.h"
+   34:  
+   35:  
+   36:  /*!
+   37:    \fn void SPIInit(void)
+   38:    \brief Initialize the SPI Control and Baud Rate Registers
+   39:  */
+   40:  void SPIInit(void){
+   41:      SPI1C1 = 0x50;   /*  
+  0000 6e5000   [4]             MOV   #80,_SPI1C1
+   42:                        *  0b01010000
+   43:                        *    ||||||||__ SPI serial data transfers start with MSB
+   44:                        *    |||||||___ SS1 used as GPIO
+   45:                        *    ||||||____ First edge occurs at the middle of cycle
+   46:                        *    |||||_____ Active-high SPI clock
+   47:                        *    ||||______ SPI Configured as Master
+   48:                        *    |||_______ SPI Transmit Interrupt Disabled
+   49:                        *    ||________ SPI System Enabled
+   50:                        *    |_________ SPI Interrupt Disabled
+   51:                        */
+   52:      SPI1C2 = 0x00;   /*  
+  0003 3f00     [5]             CLR   _SPI1C2
+   53:                        *  0b00000000
+   54:                        *    ||||||||__ Separate pins for data input and output.
+   55:                        *    |||||||___ SPI clocks operate in wait mode.
+   56:                        *    ||||||____ Unimplemented
+   57:                        *    |||||_____ SPI data I/O pin acts as an input.
+   58:                        *    ||||______ Mode Fault Disabled
+   59:                        *    |||_______ Unimplemented
+   60:                        *    ||________ Unimplemented
+   61:                        *    |_________ Unimplemented
+   62:                        */
+   63:      SPI1BR = 0x00;   /*  
+  0005 3f00     [5]             CLR   _SPI1BR
+   64:                        *  0b00000000
+   65:                        *    |||||||| 
+   66:                        *    ||||||||
+   67:                        *    ||||||++-- Rate Divisor = 2
+   68:                        *    |||||_____ Unimplemented
+   69:                        *    |||| 
+   70:                        *    |||| 
+   71:                        *    ||++------ Prescaler Divisor = 0 
+   72:                        *    |_________ Unimplemented
+   73:                        */
+   74:  }
+  0007 81       [6]             RTS   
+   75:  
+   76:  /*!
+   77:   * \def SPIWaitTransferDone()
+   78:   * \brief Waits until the SPI1D has been transferred and received
+   79:   */
+   80:  #pragma INLINE
+   81:  void SPIWaitTransferDone(void){
+  0000          L0:     
+   82:    while (!(SPI1S_SPRF));
+  0000 b600     [3]             LDA   _SPI1S
+  0002 a480     [2]             AND   #-128
+  0004 27fa     [3]             BEQ   L0 ;abs = 0000
+   83:  }
+  0006 81       [6]             RTS   
+   84:  
+   85:  /*!
+   86:   * 
+   87:   * \def SPIClearRecieveStatReg()
+   88:   * \brief SPI_ClearRecieveStatReg : Clears any flags that may be activated in the
+   89:   * the SPI Data Register.
+   90:   */
+   91:  #pragma INLINE
+   92:  void SPIClearRecieveStatReg(UINT8 * u8TempValue){
+   93:    *u8TempValue = SPI1S;
+  0000 5e00     [5]             MOV   _SPI1S,X+
+   94:  }
+  0002 81       [6]             RTS   
+   95:  
+   96:  /*! 
+   97:   * \def SPIClearRecieveDataReg()
+   98:   * \brief SPIClearRecieveDataReg : Clear receive data register. SPI entirely ready 
+   99:   * for read or write 
+  100:   */
+  101:  #pragma INLINE
+  102:  void SPIClearRecieveDataReg(UINT8 * u8TempValue){
+  103:    *u8TempValue = SPI1D;
+  0000 5e00     [5]             MOV   _SPI1D,X+
+  104:  }
+  0002 81       [6]             RTS   
+  105:  
+  106:  /*! 
+  107:   * \def SPISendChar()
+  108:   * \brief SPI_SendChar : Sends a Char through the SPI port that is being used
+  109:   *
+  110:   * Parameters : u8Char - Char to be sent through the SPI
+  111:   */
+  112:  #pragma INLINE
+  113:  void SPISendChar(UINT8 u8Char){
+  114:    SPI1D = u8Char;
+  0000 b700     [3]             STA   _SPI1D
+  115:  }
+  0002 81       [6]             RTS   
+  116:  
+  117:  /*! 
+  118:   * \def SPIRead()
+  119:   * \brief SPIRead : Returns the data that is in the SPI port.
+  120:   * Return : UINT8 - Data that is in the SPI port being used.
+  121:   */
+  122:  #pragma INLINE
+  123:  UINT8 SPIRead(void){
+  124:    return SPI1D;	 /*!<SPI Data Register*/
+  0000 b600     [3]             LDA   _SPI1D
+  125:  }
+  0002 81       [6]             RTS   
+  126:  
+  127:  
+  128:  #pragma INLINE
+  129:  void SPIReadMSB(UINT16 * u16Data){
+  130:    ((UINT8*)u16Data)[0] = SPI1D; /*!<SPI More Significant Byte*/	
+  0000 5e00     [5]             MOV   _SPI1D,X+
+  131:  //  ((UINT8*)u16Data)[0] = SPIRead(); /*!<SPI More Significant Byte*/
+  132:  }
+  0002 81       [6]             RTS   
+  133:  
+  134:  #pragma INLINE
+  135:  void SPIReadLSB(UINT16 * u16Data){
+  136:    ((UINT8*)u16Data)[1] = SPI1D; /*!<SPI Less Significant Byte*/
+  0000 b600     [3]             LDA   _SPI1D
+  0002 e701     [3]             STA   1,X
+  137:  //  ((UINT8*)u16Data)[1] = SPIRead(); /*!<SPI Less Significant Byte*/
+  138:  }
+  0004 81       [6]             RTS   
+  139:  
+  140:  
+  141:  
