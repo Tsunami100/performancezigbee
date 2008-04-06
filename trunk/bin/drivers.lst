@@ -1,0 +1,1388 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  
+    2:  /*!
+    3:   * Copyright (c) 2005, Freescale Semiconductor
+    4:   *
+    5:   * Freescale Confidential Proprietary
+    6:   * \file    drivers.c
+    7:   * \brief   This is the SMAC C source driver file for the HC(S)08
+    8:   * MCU and MC13192 transceiver.
+    9:   * \author  r01160
+   10:   * \version 4.1a
+   11:   * \date    2005/07/29 03:30:40 
+   12:   * 
+   13:   * \b Description:
+   14:   *
+   15:   * The driver controls all interfaces to/from the MC13192 by the SPI,
+   16:   * selected interrupt source and MCU GPIO's assigned to other MC13192
+   17:   * pins.The SMAC driver is the lowest layer of C code.
+   18:   * Actual hardware interconnects from the MCU to the MC13192 are 
+   19:   * defined in the MC13192_hw_config.h header file.
+   20:   *
+   21:   * \b Department: Freescale Radio Products Division 
+   22:   *
+   23:   * \b Project: SMAC (Simple Media Access Controller)
+   24:   *
+   25:   * \b History:
+   26:   * - 16/11/2005 Doc. update to Doxygen compliant by Mario Rodriguez r12369c
+   27:   */ 
+   28:   
+   29:  #include "mcu_hw_config.h"
+   30:  #include "pub_def.h"
+   31:  #include "drivers.h"
+   32:  #include "simple_phy.h"
+   33:  #include "MC13192_hw_config.h"
+   34:  #include "MC13192_regs.h"
+   35:  
+   36:  /* Globals */
+   37:  tRxPacket *psDrvRxPacket;           //!< Where the packet received will be stored 
+   38:  tCCAMeasurement sDrvCCAReading;     //!< NOT USED  
+   39:  extern UINT8 gu8RTxMode;						//!< Global mode mirror. MC13192 Status. 
+   40:  UINT8 gu8IRQValue = 0;							//!< IRQ value  
+   41:  extern tPhyOptions gsPhyOptions;
+   42:  volatile UINT16 u16StatusContent;
+   43:  
+   44:  /*!
+   45:   * \brief  MC13192 initiated IRQ interrupt handler.
+   46:   * The vector is defined in vectortable.c
+   47:   *
+   48:   * \return The interrupt will RTI unless valid data is recvd.
+   49:   * In this case a PDDataIndication function call-back will be 
+   50:   * executed first, followed by a RTI.
+   51:   *
+   52:   */
+   53:  interrupt void  IRQIsr(void)   
+   54:  {
+  0000 8b       [2]             PSHH  
+  0001 a7f8     [2]             AIS   #-8
+   55:    
+   56:      /* Result of the status register read */
+   57:      volatile UINT16 u16StatusContent, u16Reg, u16Temp;   
+   58:      /* Data length for the RX packet */
+   59:      UINT8 u8DataLength = 0;     
+   60:      UINT8 u8MinLen = 0;
+   61:      #if defined (HCS08G) | defined (HCS08R)
+   62:      /* Acknowledge the interrupt. MC13192 IRQ pin still low.*/
+   63:      CLEAR_IRQ_FLAG();   
+  0003 1400     [5]             BSET  2,_IRQSC
+   64:      #endif
+   65:      u16StatusContent = SPIDrvRead(STATUS_ADDR); /* 
+  0005 a624     [2]             LDA   #36
+  0007 cd0000   [6]             JSR   SPIDrvRead
+  000a 9eff02   [5]             STHX  2,SP
+   66:                                                   * Read the MC13192 status 
+   67:                                                   * register.
+   68:                                                   */
+   69:      /* Test for IRQ glitch or possible fast double IRQ. */
+   70:  
+   71:      if(IRQPinLow())       //__isflag_int_enabled
+  000d cd0000   [6]             JSR   IRQPinLow
+  0010 4d       [1]             TSTA  
+  0011 2725     [3]             BEQ   L38 ;abs = 0038
+   72:      {        
+   73:     
+   74:          CLEAR_IRQ_FLAG();   /* Acknowledge the interrupt. MC13192 IRQ pin still low. */     
+  0013 1400     [5]             BSET  2,_IRQSC
+   75:          u16Reg = SPIDrvRead(STATUS_ADDR);   /* Read the MC13192 status register. */
+  0015 a624     [2]             LDA   #36
+  0017 cd0000   [6]             JSR   SPIDrvRead
+  001a 9eff07   [5]             STHX  7,SP
+   76:          u16StatusContent = u16StatusContent | u16Reg;   /* 
+  001d 9efe07   [5]             LDHX  7,SP
+  0020 89       [2]             PSHX  
+  0021 8b       [2]             PSHH  
+  0022 9efe04   [5]             LDHX  4,SP
+  0025 9f       [1]             TXA   
+  0026 8b       [2]             PSHH  
+  0027 95       [2]             TSX   
+  0028 ea02     [3]             ORA   2,X
+  002a e702     [3]             STA   2,X
+  002c 86       [3]             PULA  
+  002d ea01     [3]             ORA   1,X
+  002f 87       [2]             PSHA  
+  0030 ee02     [3]             LDX   2,X
+  0032 8a       [3]             PULH  
+  0033 9eff04   [5]             STHX  4,SP
+  0036 a702     [2]             AIS   #2
+  0038          L38:    
+   77:                                                           * Actual status is the OR 
+   78:                                                           * of both.
+   79:                                                           */
+   80:      }   
+   81:      
+   82:      if (gsPhyOptions.Bits.u1PromiscuousMode)
+  0038 c60001   [4]             LDA   gsPhyOptions:1
+  003b a501     [2]             BIT   #1
+  003d 2704     [3]             BEQ   L43 ;abs = 0043
+   83:        u8MinLen = 3;
+  003f a603     [2]             LDA   #3
+  0041 2002     [3]             BRA   L45 ;abs = 0045
+  0043          L43:    
+   84:      else
+   85:        u8MinLen = 5;
+  0043 a605     [2]             LDA   #5
+  0045          L45:    
+   86:  
+   87:      u16StatusContent &= TX_IRQ_MASK | RX_IRQ_MASK | ATTN_IRQ_MASK | \
+  0045 9efe02   [5]             LDHX  2,SP
+  0048 87       [2]             PSHA  
+  0049 9f       [1]             TXA   
+  004a a4e3     [2]             AND   #-29
+  004c 87       [2]             PSHA  
+  004d 8b       [2]             PSHH  
+  004e 86       [3]             PULA  
+  004f a487     [2]             AND   #-121
+  0051 87       [2]             PSHA  
+  0052 8a       [3]             PULH  
+  0053 88       [3]             PULX  
+  0054 9eff03   [5]             STHX  3,SP
+   88:                          CRC_VALID_MASK | TIMER1_IRQ_MASK | CCA_IRQ_MASK | \
+   89:                          LO_LOCK_IRQ_MASK | DOZE_IRQ_MASK | CCA_BIT_MASK;
+   90:                          
+   91:      if (gu8RTxMode != RX_MODE_WTO) {
+  0057 c60000   [4]             LDA   gu8RTxMode
+  005a a180     [2]             CMP   #-128
+  005c cd0000   [6]             JSR   _PUSH_CC
+  005f 9ee605   [4]             LDA   5,SP
+  0062 cd0000   [6]             JSR   _POP_CC
+  0065 8a       [3]             PULH  
+  0066 270f     [3]             BEQ   L77 ;abs = 0077
+   92:          /* If timeout not being used, mask out timer. */
+   93:          u16StatusContent &= ~(TIMER1_IRQ_MASK);
+  0068 9eee03   [4]             LDX   3,SP
+  006b 9eef03   [4]             STX   3,SP
+  006e 87       [2]             PSHA  
+  006f 95       [2]             TSX   
+  0070 e602     [3]             LDA   2,X
+  0072 a4fe     [2]             AND   #-2
+  0074 e702     [3]             STA   2,X
+  0076 86       [3]             PULA  
+  0077          L77:    
+   94:      }
+   95:      
+   96:      if ((u16StatusContent & ~(CRC_VALID_MASK)) == 0) {
+  0077 95       [2]             TSX   
+  0078 f7       [2]             STA   ,X
+  0079 e602     [3]             LDA   2,X
+  007b a4fe     [2]             AND   #-2
+  007d 87       [2]             PSHA  
+  007e e601     [3]             LDA   1,X
+  0080 87       [2]             PSHA  
+  0081 8a       [3]             PULH  
+  0082 88       [3]             PULX  
+  0083 650000   [3]             CPHX  #0
+  0086 2603     [3]             BNE   L8B ;abs = 008b
+  0088 cc0224   [4]             JMP   L224 ;abs = 0224
+  008b          L8B:    
+   97:          /* If no status bits are set just return. */
+   98:          return;
+   99:      }
+  100:      
+  101:      /* DOZE Complete Interrupt */
+  102:      if ((u16StatusContent & DOZE_IRQ_MASK) != 0) {
+  008b 5f       [1]             CLRX  
+  008c a402     [2]             AND   #2
+  008e 87       [2]             PSHA  
+  008f 8a       [3]             PULH  
+  0090 650000   [3]             CPHX  #0
+  0093 cd0000   [6]             JSR   _PUSH_CC
+  0096 9ee605   [4]             LDA   5,SP
+  0099 cd0000   [6]             JSR   _POP_CC
+  009c 272a     [3]             BEQ   LC8 ;abs = 00c8
+  103:          SPIDrvWrite(T2_HI_ADDR, 0x8000); /* disable the timer2 */
+  009e 95       [2]             TSX   
+  009f f7       [2]             STA   ,X
+  00a0 a61d     [2]             LDA   #29
+  00a2 458000   [3]             LDHX  #-32768
+  00a5 cd0000   [6]             JSR   SPIDrvWrite
+  104:          u16Temp= SPIDrvRead(MODE2_ADDR);
+  00a8 a607     [2]             LDA   #7
+  00aa cd0000   [6]             JSR   SPIDrvRead
+  00ad 9eff04   [5]             STHX  4,SP
+  105:          u16Temp &= 0xFFFC;
+  00b0 9efe04   [5]             LDHX  4,SP
+  00b3 9f       [1]             TXA   
+  00b4 a4fc     [2]             AND   #-4
+  00b6 97       [1]             TAX   
+  00b7 9eff04   [5]             STHX  4,SP
+  106:          SPIDrvWrite(MODE2_ADDR, u16Temp);/* disable doze/hibernate modes */      
+  00ba a607     [2]             LDA   #7
+  00bc 9efe04   [5]             LDHX  4,SP
+  00bf cd0000   [6]             JSR   SPIDrvWrite
+  107:          gu8RTxMode = IDLE_MODE;        
+  00c2 4f       [1]             CLRA  
+  00c3 c70000   [4]             STA   gu8RTxMode
+  00c6 95       [2]             TSX   
+  00c7 f6       [3]             LDA   ,X
+  00c8          LC8:    
+  108:      }  
+  109:      
+  110:      /* ATTN IRQ Handler*/
+  111:      if ((u16StatusContent & ATTN_IRQ_MASK) != 0) {
+  00c8 5f       [1]             CLRX  
+  00c9 9ee701   [4]             STA   1,SP
+  00cc 9ee602   [4]             LDA   2,SP
+  00cf a404     [2]             AND   #4
+  00d1 87       [2]             PSHA  
+  00d2 8a       [3]             PULH  
+  00d3 650000   [3]             CPHX  #0
+  00d6 2728     [3]             BEQ   L100 ;abs = 0100
+  112:         /* 
+  113:          * If attn interrupt, set the rtx_state mirror.
+  114:          * For MC13192 V2.x devices, read the reset indication in R25/7 first. 
+  115:          * If a reset is indicated, call back to a reset handler. 
+  116:          */
+  117:          u16StatusContent = SPIDrvRead(RESIND_ADDR); /* 
+  00d8 a625     [2]             LDA   #37
+  00da cd0000   [6]             JSR   SPIDrvRead
+  00dd 9eff02   [5]             STHX  2,SP
+  118:                                                       * Read the MC13192 reset 
+  119:                                                       * indicator register.
+  120:                                                       */
+  121:          u16StatusContent &= RESET_BIT_MASK;
+  00e0 9eee03   [4]             LDX   3,SP
+  00e3 9f       [1]             TXA   
+  00e4 a480     [2]             AND   #-128
+  00e6 8c       [1]             CLRH  
+  00e7 97       [1]             TAX   
+  00e8 9eff02   [5]             STHX  2,SP
+  122:          if (u16StatusContent == 0) {            /* Reset */
+  00eb 9efe02   [5]             LDHX  2,SP
+  00ee 260b     [3]             BNE   LFB ;abs = 00fb
+  123:              gu8RTxMode = MC13192_RESET_MODE;    /* 
+  00f0 a687     [2]             LDA   #-121
+  00f2 c70000   [4]             STA   gu8RTxMode
+  124:                                                   * Set the rtx_state mirror to 
+  125:                                                   * idle with attn.
+  126:                                                   */
+  127:              PLMEMC13192ResetIndication();
+  00f5 cd0000   [6]             JSR   PLMEMC13192ResetIndication
+  128:              return;
+  00f8 cc0224   [4]             JMP   L224 ;abs = 0224
+  00fb          LFB:    
+  129:          }
+  130:          else {
+  131:              gu8RTxMode = IDLE_MODE_ATTN;    /* 
+  00fb a684     [2]             LDA   #-124
+  132:                                               * Set the rtx_state mirror to idle
+  133:                                               * with attn.
+  134:                                               */
+  135:              return;
+  00fd cc018a   [4]             JMP   L18A ;abs = 018a
+  0100          L100:   
+  136:          }
+  137:      }
+  138:      /* TIMER1 IRQ Handler (Used for receiver timeout notification) */
+  139:      if ((u16StatusContent & TIMER1_IRQ_MASK) != 0) {
+  0100 9ee602   [4]             LDA   2,SP
+  0103 a401     [2]             AND   #1
+  0105 87       [2]             PSHA  
+  0106 8a       [3]             PULH  
+  0107 650000   [3]             CPHX  #0
+  010a cd0000   [6]             JSR   _PUSH_CC
+  010d 9ee605   [4]             LDA   5,SP
+  0110 cd0000   [6]             JSR   _POP_CC
+  0113 2727     [3]             BEQ   L13C ;abs = 013c
+  140:          /* If timeout ocurs (and timeout enabled), update mode mirror state. */  
+  141:          if (gu8RTxMode == RX_MODE_WTO) {
+  0115 ce0000   [4]             LDX   gu8RTxMode
+  0118 a380     [2]             CPX   #-128
+  011a 2620     [3]             BNE   L13C ;abs = 013c
+  142:              /* Clear Timer1 if in RX_MODE_WTO */
+  143:              SPIDrvWrite(T1_HI_ADDR, 0x8000); /* Disables TC1 and clears IRQ */
+  011c a61b     [2]             LDA   #27
+  011e 458000   [3]             LDHX  #-32768
+  0121 cd0000   [6]             JSR   SPIDrvWrite
+  144:              SPIDrvWrite(T1_LO_ADDR, 0x0000);
+  0124 a61c     [2]             LDA   #28
+  0126 5f       [1]             CLRX  
+  0127 8c       [1]             CLRH  
+  0128 cd0000   [6]             JSR   SPIDrvWrite
+  145:              psDrvRxPacket->u8Status = TIMEOUT;
+  012b a685     [2]             LDA   #-123
+  012d 320000   [5]             LDHX  psDrvRxPacket
+  0130 e704     [3]             STA   4,X
+  146:              RTXENDeAssert();                 /* Forces the MC13192 to idle. */
+  0132 cd0000   [6]             JSR   RTXENDeAssert
+  147:              gu8RTxMode = IDLE_MODE;
+  0135 4f       [1]             CLRA  
+  0136 c70000   [4]             STA   gu8RTxMode
+  148:              PDDataIndication();              /* TIMEOUT notification */
+  149:              return;
+  0139 cc0221   [4]             JMP   L221 ;abs = 0221
+  013c          L13C:   
+  150:          }
+  151:      }
+  152:      /* LO LOCK IRQ - Occurs when MC13192 loses LOCK */
+  153:      /* For receive cycles, re-enable. For transmit/CCA, abort. */
+  154:      if ((u16StatusContent & LO_LOCK_IRQ_MASK) != 0) {
+  013c 5f       [1]             CLRX  
+  013d 9ee701   [4]             STA   1,SP
+  0140 9ee602   [4]             LDA   2,SP
+  0143 a480     [2]             AND   #-128
+  0145 87       [2]             PSHA  
+  0146 8a       [3]             PULH  
+  0147 650000   [3]             CPHX  #0
+  014a 2721     [3]             BEQ   L16D ;abs = 016d
+  155:          RTXENDeAssert(); /* Forces the MC13192 to idle. */
+  014c cd0000   [6]             JSR   RTXENDeAssert
+  156:          /* Unlock from receive cycles */
+  157:          if ((gu8RTxMode == RX_MODE) || (gu8RTxMode == RX_MODE_WTO) || \
+  014f c60000   [4]             LDA   gu8RTxMode
+  0152 a102     [2]             CMP   #2
+  0154 2603     [3]             BNE   L159 ;abs = 0159
+  0156 cc01e9   [4]             JMP   L1E9 ;abs = 01e9
+  0159          L159:   
+  0159 a180     [2]             CMP   #-128
+  015b 2603     [3]             BNE   L160 ;abs = 0160
+  015d cc01e9   [4]             JMP   L1E9 ;abs = 01e9
+  0160          L160:   
+  0160 a101     [2]             CMP   #1
+  0162 2603     [3]             BNE   L167 ;abs = 0167
+  0164 cc01e9   [4]             JMP   L1E9 ;abs = 01e9
+  0167          L167:   
+  0167 a143     [2]             CMP   #67
+  0169 261e     [3]             BNE   L189 ;abs = 0189
+  158:              (gu8RTxMode == CCA_MODE) || (gu8RTxMode == PULSE_TX_MODE)) {
+  159:              /* Read the MC13192 trx register. Timer trigger off. */
+  160:              u16StatusContent = (SPIDrvRead(MODE_ADDR) & 0xFF7F); 
+  161:              SPIDrvWrite(MODE_ADDR, u16StatusContent);   /* 
+  162:                                                           * Re-write the trx 
+  163:                                                           * register.
+  164:                                                           */  
+  165:              RTXENAssert();          /* Re-start the sequence. */
+  166:          }
+  016b 207c     [3]             BRA   L1E9 ;abs = 01e9
+  016d          L16D:   
+  167:          else {
+  168:              gu8RTxMode = IDLE_MODE;
+  169:          }
+  170:          return;
+  171:      }
+  172:      if ((gu8RTxMode == IDLE_MODE) || ((u16StatusContent & CCA_IRQ_MASK) != 0) || \
+  016d c60000   [4]             LDA   gu8RTxMode
+  0170 270e     [3]             BEQ   L180 ;abs = 0180
+  0172 9ee603   [4]             LDA   3,SP
+  0175 a420     [2]             AND   #32
+  0177 2607     [3]             BNE   L180 ;abs = 0180
+  0179 9ee603   [4]             LDA   3,SP
+  017c a440     [2]             AND   #64
+  017e 2710     [3]             BEQ   L190 ;abs = 0190
+  0180          L180:   
+  173:         ((u16StatusContent & TX_IRQ_MASK) != 0)) {
+  174:          /* If in idle mode already or if CCA or TX is done, just return. */
+  175:          RTXENDeAssert();            /* Forces the MC13192 to idle. */
+  0180 cd0000   [6]             JSR   RTXENDeAssert
+  176:          
+  177:          
+  178:          /* Check for Pulse TX Mode for PRBS9 Test mode sequence */
+  179:          if (gu8RTxMode == PULSE_TX_MODE) {
+  0183 c60000   [4]             LDA   gu8RTxMode
+  0186 414360   [4]             CBEQA #67,L1E9 ;abs = 01e9
+  0189          L189:   
+  180:                  u16StatusContent = (SPIDrvRead(MODE_ADDR) & 0xFF7F); /* Read the MC13192 trx register. Timer trigger off. */
+  181:                  SPIDrvWrite(MODE_ADDR, u16StatusContent); /* Re-write the trx register. */  
+  182:                    RTXENAssert(); /* Re-start the sequence. */
+  183:              
+  184:                  #if defined (PA)
+  185:              MC13192_PA_CTRL = PA_OFF;       //Turn off the PA when TX is complete
+  186:              #endif
+  187:              return;
+  188:          }
+  189:          
+  190:          gu8RTxMode = IDLE_MODE;
+  0189 4f       [1]             CLRA  
+  018a          L18A:   
+  018a c70000   [4]             STA   gu8RTxMode
+  018d cc0224   [4]             JMP   L224 ;abs = 0224
+  0190          L190:   
+  191:          return;
+  192:      }
+  193:      /* If rx is done */
+  194:      if ((u16StatusContent & RX_IRQ_MASK) != 0) 
+  0190 9ee603   [4]             LDA   3,SP
+  0193 a480     [2]             AND   #-128
+  0195 2603     [3]             BNE   L19A ;abs = 019a
+  0197 cc0224   [4]             JMP   L224 ;abs = 0224
+  019a          L19A:   
+  195:      {  
+  196:          RTXENDeAssert();            /* Forces the MC13192 to idle. */
+  019a cd0000   [6]             JSR   RTXENDeAssert
+  197:          if (((u16StatusContent & CRC_VALID_MASK) == 0) && ((gsPhyOptions.Bits.u1PromiscuousMode == FALSE))) 
+  019d 95       [2]             TSX   
+  019e e602     [3]             LDA   2,X
+  01a0 a401     [2]             AND   #1
+  01a2 cd0000   [6]             JSR   _PUSH_CC
+  01a5 f6       [3]             LDA   ,X
+  01a6 cd0000   [6]             JSR   _POP_CC
+  01a9 2612     [3]             BNE   L1BD ;abs = 01bd
+  01ab 87       [2]             PSHA  
+  01ac c60001   [4]             LDA   gsPhyOptions:1
+  01af a501     [2]             BIT   #1
+  01b1 cd0000   [6]             JSR   _PUSH_CC
+  01b4 9ee605   [4]             LDA   5,SP
+  01b7 cd0000   [6]             JSR   _POP_CC
+  01ba 8a       [3]             PULH  
+  01bb 272c     [3]             BEQ   L1E9 ;abs = 01e9
+  01bd          L1BD:   
+  198:          {
+  199:              /* If an invalid CRC, restart receiver. */
+  200:              /* Read the MC13192 trx register. Timer trigger off. */
+  201:              u16StatusContent = (SPIDrvRead(MODE_ADDR) & 0xFF7F); 
+  202:              /* Update the trx register */          
+  203:              SPIDrvWrite(MODE_ADDR, u16StatusContent); 
+  204:              RTXENAssert(); /* Forces the MC13192 to enter the receive mode. */
+  205:  //            psDrvRxPacket->u8Status = CRC_ERROR;
+  206:  //            PDDataIndication(); /* Notify PHY that there is data available. */            
+  207:              return;
+  208:          }
+  209:          else {
+  210:              /* Read received packet length register and mask off length bits */
+  211:              u8DataLength = (UINT8) (SPIDrvRead(RX_PKT_LEN) & 0x7F);
+  01bd 87       [2]             PSHA  
+  01be a62d     [2]             LDA   #45
+  01c0 cd0000   [6]             JSR   SPIDrvRead
+  01c3 9f       [1]             TXA   
+  01c4 a47f     [2]             AND   #127
+  01c6 95       [2]             TSX   
+  01c7 e706     [3]             STA   6,X
+  212:  if(TRUE) {
+  213:    
+  214:              if (u8DataLength < u8MinLen) /* Rx_pkt_length is bad when <5 because of CRC and byte codes. */
+  01c9 86       [3]             PULA  
+  01ca e106     [3]             CMP   6,X
+  01cc 221b     [3]             BHI   L1E9 ;abs = 01e9
+  215:              {
+  216:                  /* Read the MC13192 trx register. Timer trigger off. */                
+  217:                  u16StatusContent = (SPIDrvRead(MODE_ADDR) & 0xFF7F); 
+  218:                  /* Update the trx register. */ 
+  219:                  SPIDrvWrite(MODE_ADDR, u16StatusContent);
+  220:                  /* Forces the MC13192 to enter the receive mode. */
+  221:                  RTXENAssert();  
+  222:                  return;
+  223:              }
+  224:              /* Test the Byte Codes */
+  225:              if (gsPhyOptions.Bits.u1PromiscuousMode == 0)
+  01ce c60001   [4]             LDA   gsPhyOptions:1
+  01d1 a501     [2]             BIT   #1
+  01d3 262d     [3]             BNE   L202 ;abs = 0202
+  226:              {
+  227:                u16Temp = SPIDrvRead2(RX_PKT); /* Get the code bytes */
+  01d5 a601     [2]             LDA   #1
+  01d7 cd0000   [6]             JSR   SPIDrvRead2
+  01da 9eff04   [5]             STHX  4,SP
+  228:                
+  229:                if ((u16Temp != 0xFF7E) && ((gsPhyOptions.Bits.u1PromiscuousMode == FALSE)))
+  01dd 65ff7e   [3]             CPHX  #-130
+  01e0 2720     [3]             BEQ   L202 ;abs = 0202
+  01e2 c60001   [4]             LDA   gsPhyOptions:1
+  01e5 a501     [2]             BIT   #1
+  01e7 2619     [3]             BNE   L202 ;abs = 0202
+  01e9          L1E9:   
+  230:                {
+  231:                    /* Read the MC13192 trx register. Timer trigger off. */                
+  232:                    u16StatusContent = (SPIDrvRead(MODE_ADDR) & 0xFF7F); 
+  01e9 a606     [2]             LDA   #6
+  01eb cd0000   [6]             JSR   SPIDrvRead
+  01ee 9f       [1]             TXA   
+  01ef a47f     [2]             AND   #127
+  01f1 97       [1]             TAX   
+  01f2 9eff02   [5]             STHX  2,SP
+  233:                    /* Update the trx register. */ 
+  234:                    SPIDrvWrite(MODE_ADDR, u16StatusContent);
+  01f5 a606     [2]             LDA   #6
+  01f7 9efe02   [5]             LDHX  2,SP
+  01fa cd0000   [6]             JSR   SPIDrvWrite
+  235:                    /* Forces the MC13192 to enter the receive mode. */
+  236:                    RTXENAssert();  
+  01fd cd0000   [6]             JSR   RTXENAssert
+  0200 2022     [3]             BRA   L224 ;abs = 0224
+  0202          L202:   
+  237:                    return;
+  238:                }
+  239:                
+  240:              }
+  241:  }
+  242:              /* A valid packet has been received. */
+  243:              gu8RTxMode = IDLE_MODE;             /* Set the rtx_state to idle */
+  0202 5f       [1]             CLRX  
+  0203 cf0000   [4]             STX   gu8RTxMode
+  244:              SPIDrvWrite(T1_HI_ADDR, 0x8000);    /* 
+  0206 a61b     [2]             LDA   #27
+  0208 458000   [3]             LDHX  #-32768
+  020b cd0000   [6]             JSR   SPIDrvWrite
+  245:                                                   * Disables TC1 and clears the 
+  246:                                                   * IRQ. 
+  247:                                                   */
+  248:              SPIDrvWrite(T1_LO_ADDR, 0x0000);
+  020e a61c     [2]             LDA   #28
+  0210 5f       [1]             CLRX  
+  0211 8c       [1]             CLRH  
+  0212 cd0000   [6]             JSR   SPIDrvWrite
+  249:              psDrvRxPacket->u8DataLength = u8DataLength;
+  0215 9ee606   [4]             LDA   6,SP
+  0218 320000   [5]             LDHX  psDrvRxPacket
+  021b e701     [3]             STA   1,X
+  250:              psDrvRxPacket->u8Status = SUCCESS;
+  021d a677     [2]             LDA   #119
+  021f e704     [3]             STA   4,X
+  0221          L221:   
+  251:              PDDataIndication(); /* Notify PHY that there is data available. */
+  0221 cd0000   [6]             JSR   PDDataIndication
+  0224          L224:   
+  252:              return;
+  253:          }
+  254:      }
+  255:  }
+  0224 a708     [2]             AIS   #8
+  0226 8a       [3]             PULH  
+  0227 80       [9]             RTI   
+  256:  
+  257:  
+  258:  /*!
+  259:   * \brief SPIDrvWrite : Write 1 word to SPI
+  260:   *
+  261:   * \param u8Addr - SPI address
+  262:   * \param u16Content - Data to send
+  263:   *
+  264:   */
+  265:  void SPIDrvWrite(UINT8 u8Addr, UINT16 u16Content)
+  266:  {
+  0000 87       [2]             PSHA  
+  0001 89       [2]             PSHX  
+  0002 8b       [2]             PSHH  
+  0003 8b       [2]             PSHH  
+  267:    UINT8 u8TempValue=0;
+  0004 95       [2]             TSX   
+  0005 7f       [4]             CLR   ,X
+  268:  
+  269:    SPIClearRecieveStatReg(&u8TempValue); /* Clear status register (possible SPRF, SPTEF) */  
+  0006 cd0000   [6]             JSR   SPIClearRecieveStatReg
+  270:    SPIClearRecieveDataReg(&u8TempValue); /* 
+  0009 95       [2]             TSX   
+  000a cd0000   [6]             JSR   SPIClearRecieveDataReg
+  271:                               * Clear receive data register. SPI entirely ready 
+  272:                               * for read or write 
+  273:                               */                       
+  274:    MC13192DisableInterrupts();   /* Necessary to prevent double SPI access */
+  000d cd0000   [6]             JSR   MC13192DisableInterrupts
+  275:    AssertCE();                   /* Enables MC13192 SPI */
+  0010 cd0000   [6]             JSR   AssertCE
+  276:    SPISendChar(u8Addr & 0x3F);   /*
+  0013 9ee604   [4]             LDA   4,SP
+  0016 a43f     [2]             AND   #63
+  0018 cd0000   [6]             JSR   SPISendChar
+  277:                                   * Mask address, 6bit addr. 
+  278:                                   * Set write bit (i.e. 0). 
+  279:                                   */
+  280:    SPIWaitTransferDone();        /* 
+  001b cd0000   [6]             JSR   SPIWaitTransferDone
+  281:                                   * For this bit to be set, SPTED MUST be set.
+  282:                                   * Now write content MSB
+  283:                                   */
+  284:    SPIClearRecieveDataReg(&u8TempValue);     /* 
+  001e 95       [2]             TSX   
+  001f cd0000   [6]             JSR   SPIClearRecieveDataReg
+  285:                                   * Clear receive data register. SPI entirely 
+  286:                                   * ready for read or write 
+  287:                                   */
+  288:    SPISendChar((UINT8)(u16Content >> 8));    /* Write MSB */       
+  0022 9ee602   [4]             LDA   2,SP
+  0025 cd0000   [6]             JSR   SPISendChar
+  289:    SPIWaitTransferDone();        /* 
+  0028 cd0000   [6]             JSR   SPIWaitTransferDone
+  290:                                   * For this bit to be set, SPTED MUST be set. 
+  291:                                   * Now write content LSB 
+  292:                                   */
+  293:    SPIClearRecieveDataReg(&u8TempValue);     /* 
+  002b 95       [2]             TSX   
+  002c cd0000   [6]             JSR   SPIClearRecieveDataReg
+  294:                                   * Clear receive data register. SPI entirely 
+  295:                                   * ready for read or write
+  296:                                   */
+  297:    SPISendChar((UINT8)(u16Content & 0x00FF));    /* Write LSB */
+  002f 9ee603   [4]             LDA   3,SP
+  0032 cd0000   [6]             JSR   SPISendChar
+  298:    SPIWaitTransferDone();        /* 
+  0035 cd0000   [6]             JSR   SPIWaitTransferDone
+  299:                                   * For this bit to be set, SPTED MUST be set.
+  300:                                   * Now read last of garbage
+  301:                                   */
+  302:    SPIClearRecieveDataReg(&u8TempValue);     /* 
+  0038 95       [2]             TSX   
+  0039 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  303:                                   * Clear receive data register. SPI entirely 
+  304:                                   * ready for read or write 
+  305:                                   */
+  306:    DeAssertCE();                 /* Disables MC13192 SPI */
+  003c cd0000   [6]             JSR   DeAssertCE
+  307:    MC13192RestoreInterrupts();   /* Restore MC13192 interrupt status */
+  003f cd0000   [6]             JSR   MC13192RestoreInterrupts
+  308:  }
+  0042 a704     [2]             AIS   #4
+  0044 81       [6]             RTS   
+  309:  
+  310:  
+  311:  /*!
+  312:   * \brief SPIDrvRead : Read 1 word from SPI
+  313:   *
+  314:   * \param u8Addr - SPI address
+  315:   *
+  316:   * \return u16Data -  u16Data[0] is the MSB, u16Data[1] is the LSB
+  317:   */
+  318:  UINT16 SPIDrvRead(UINT8 u8Addr)
+  319:  {
+  0000 87       [2]             PSHA  
+  0001 a7fd     [2]             AIS   #-3
+  320:      UINT8 u8TempValue=0;
+  0003 95       [2]             TSX   
+  0004 6f02     [5]             CLR   2,X
+  321:      UINT16  u16Data=0;            /* u16Data[0] is MSB, u16Data[1] is LSB */
+  0006 6f01     [5]             CLR   1,X
+  0008 7f       [4]             CLR   ,X
+  322:  
+  323:      SPIClearRecieveStatReg(&u8TempValue);  /* Clear status register (possible SPRF, SPTEF) */  
+  0009 af02     [2]             AIX   #2
+  000b cd0000   [6]             JSR   SPIClearRecieveStatReg
+  324:      SPIClearRecieveDataReg(&u8TempValue);  /* 
+  000e 95       [2]             TSX   
+  000f af02     [2]             AIX   #2
+  0011 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  325:                                   * Clear receive data register. SPI entirely 
+  326:                                   * ready for read or write
+  327:                                   */                       
+  328:      MC13192DisableInterrupts(); /* Necessary to prevent double SPI access */
+  0014 cd0000   [6]             JSR   MC13192DisableInterrupts
+  329:      AssertCE();                 /* Enables MC13192 SPI */
+  0017 cd0000   [6]             JSR   AssertCE
+  330:      SPISendChar((u8Addr & 0x3f) | 0x80);   /* Mask address, 6bit addr, Set 
+  001a 9ee604   [4]             LDA   4,SP
+  001d a43f     [2]             AND   #63
+  001f aa80     [2]             ORA   #-128
+  0021 cd0000   [6]             JSR   SPISendChar
+  331:                                               * read bit. 
+  332:                                               */
+  333:      SPIWaitTransferDone();      /* For this bit to be set, SPTED MUST be set */
+  0024 cd0000   [6]             JSR   SPIWaitTransferDone
+  334:      SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0027 95       [2]             TSX   
+  0028 af02     [2]             AIX   #2
+  002a cd0000   [6]             JSR   SPIClearRecieveDataReg
+  335:                                   * Clear receive data register. SPI 
+  336:                                   * entirely ready for read or write 
+  337:                                   */
+  338:      SPISendChar(u8Addr );       /*
+  002d 9ee604   [4]             LDA   4,SP
+  0030 cd0000   [6]             JSR   SPISendChar
+  339:                                   * Dummy write. Receive register of SPI 
+  340:                                   * will contain MSB
+  341:                                   */
+  342:      SPIWaitTransferDone();      /* 
+  0033 cd0000   [6]             JSR   SPIWaitTransferDone
+  343:                                   * For this bit to be set, SPTED MUST be 
+  344:                                   * set. Get MSB
+  345:                                   */
+  346:      SPIReadMSB(&u16Data);               /* MSB */
+  0036 95       [2]             TSX   
+  0037 cd0000   [6]             JSR   SPIReadMSB
+  347:      SPISendChar(u8Addr);             /*
+  003a 9ee604   [4]             LDA   4,SP
+  003d cd0000   [6]             JSR   SPISendChar
+  348:                                         * Dummy write. Waiting until after 
+  349:                                         * reading received data insures no 
+  350:                                         * overrun 
+  351:                                         */
+  352:      SPIWaitTransferDone();            /* 
+  0040 cd0000   [6]             JSR   SPIWaitTransferDone
+  353:                                         * For this bit to be set, SPTED MUST be 
+  354:                                         * set. Get LSB
+  355:                                         */
+  356:      ((UINT8*)&u16Data)[1] = SPIRead();    /* LSB */
+  0043 cd0000   [6]             JSR   SPIRead
+  0046 9ee702   [4]             STA   2,SP
+  357:      DeAssertCE();                     /* Disables MC13192 SPI */
+  0049 cd0000   [6]             JSR   DeAssertCE
+  358:      MC13192RestoreInterrupts();       /* Restore MC13192 interrupt status */
+  004c cd0000   [6]             JSR   MC13192RestoreInterrupts
+  359:      return u16Data;
+  004f 9efe01   [5]             LDHX  1,SP
+  360:  }
+  0052 a704     [2]             AIS   #4
+  0054 81       [6]             RTS   
+  361:  
+  362:  /*!
+  363:   * \brief SPIDrvRead2 : Read the second word from SPI
+  364:   *
+  365:   * \param u8Addr - SPI address
+  366:   *
+  367:   * \return u16Data -  u16Data[0] is the MSB, u16Data[1] is the LSB
+  368:   */
+  369:  UINT16 SPIDrvRead2(UINT8 u8Addr)
+  370:  {
+  0000 87       [2]             PSHA  
+  0001 a7fd     [2]             AIS   #-3
+  371:      UINT8 u8TempValue=0;
+  0003 95       [2]             TSX   
+  0004 6f02     [5]             CLR   2,X
+  372:      UINT16  u16Data=0;            /* u16Data[0] is MSB, u16Data[1] is LSB */
+  0006 6f01     [5]             CLR   1,X
+  0008 7f       [4]             CLR   ,X
+  373:  
+  374:      SPIClearRecieveStatReg(&u8TempValue);  /* Clear status register (possible SPRF, SPTEF) */  
+  0009 af02     [2]             AIX   #2
+  000b cd0000   [6]             JSR   SPIClearRecieveStatReg
+  375:      SPIClearRecieveDataReg(&u8TempValue);  /* 
+  000e 95       [2]             TSX   
+  000f af02     [2]             AIX   #2
+  0011 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  376:                                   * Clear receive data register. SPI entirely 
+  377:                                   * ready for read or write
+  378:                                   */                       
+  379:      MC13192DisableInterrupts(); /* Necessary to prevent double SPI access */
+  0014 cd0000   [6]             JSR   MC13192DisableInterrupts
+  380:      AssertCE();                 /* Enables MC13192 SPI */
+  0017 cd0000   [6]             JSR   AssertCE
+  381:      SPISendChar((u8Addr & 0x3f) | 0x80);   /* Mask address, 6bit addr, Set 
+  001a 9ee604   [4]             LDA   4,SP
+  001d a43f     [2]             AND   #63
+  001f aa80     [2]             ORA   #-128
+  0021 cd0000   [6]             JSR   SPISendChar
+  382:                                               * read bit. 
+  383:                                               */
+  384:      SPIWaitTransferDone();      /* For this bit to be set, SPTED MUST be set */
+  0024 cd0000   [6]             JSR   SPIWaitTransferDone
+  385:      SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0027 95       [2]             TSX   
+  0028 af02     [2]             AIX   #2
+  002a cd0000   [6]             JSR   SPIClearRecieveDataReg
+  386:                                   * Clear receive data register. SPI 
+  387:                                   * entirely ready for read or write 
+  388:                                   */
+  389:      SPISendChar(u8Addr );       /*
+  002d 9ee604   [4]             LDA   4,SP
+  0030 cd0000   [6]             JSR   SPISendChar
+  390:                                   * Dummy write. Receive register of SPI 
+  391:                                   * will contain MSB
+  392:                                   */
+  393:      SPIWaitTransferDone();      /* 
+  0033 cd0000   [6]             JSR   SPIWaitTransferDone
+  394:                                   * For this bit to be set, SPTED MUST be 
+  395:                                   * set. Get MSB
+  396:                                   */
+  397:      SPIReadMSB(&u16Data);               /* MSB */
+  0036 95       [2]             TSX   
+  0037 cd0000   [6]             JSR   SPIReadMSB
+  398:      SPISendChar(u8Addr);             /*
+  003a 9ee604   [4]             LDA   4,SP
+  003d cd0000   [6]             JSR   SPISendChar
+  399:                                         * Dummy write. Waiting until after 
+  400:                                         * reading received data insures no 
+  401:                                         * overrun 
+  402:                                         */
+  403:      SPIWaitTransferDone();            /* 
+  0040 cd0000   [6]             JSR   SPIWaitTransferDone
+  404:                                         * For this bit to be set, SPTED MUST be 
+  405:                                         * set. Get LSB
+  406:                                         */
+  407:      SPIReadLSB(&u16Data);               /* LSB */
+  0043 95       [2]             TSX   
+  0044 cd0000   [6]             JSR   SPIReadLSB
+  408:      SPISendChar(u8Addr);             /*
+  0047 9ee604   [4]             LDA   4,SP
+  004a cd0000   [6]             JSR   SPISendChar
+  409:                                         * Dummy write. Waiting until after 
+  410:                                         * reading received data insures no 
+  411:                                         * overrun 
+  412:                                         */
+  413:      SPIWaitTransferDone();            /* 
+  004d cd0000   [6]             JSR   SPIWaitTransferDone
+  414:                                         * For this bit to be set, SPTED MUST be 
+  415:                                         * set. Get LSB
+  416:                                         */
+  417:      SPIReadMSB(&u16Data);               /* MSB */
+  0050 95       [2]             TSX   
+  0051 cd0000   [6]             JSR   SPIReadMSB
+  418:      SPISendChar(u8Addr);             /*
+  0054 9ee604   [4]             LDA   4,SP
+  0057 cd0000   [6]             JSR   SPISendChar
+  419:                                         * Dummy write. Waiting until after 
+  420:                                         * reading received data insures no 
+  421:                                         * overrun 
+  422:                                         */
+  423:      SPIWaitTransferDone();            /* 
+  005a cd0000   [6]             JSR   SPIWaitTransferDone
+  424:                                         * For this bit to be set, SPTED MUST be 
+  425:                                         * set. Get LSB
+  426:                                         */
+  427:      SPIReadLSB(&u16Data);               /* LSB */
+  005d 95       [2]             TSX   
+  005e cd0000   [6]             JSR   SPIReadLSB
+  428:      DeAssertCE();                     /* Disables MC13192 SPI */
+  0061 cd0000   [6]             JSR   DeAssertCE
+  429:      MC13192RestoreInterrupts();       /* Restore MC13192 interrupt status */
+  0064 cd0000   [6]             JSR   MC13192RestoreInterrupts
+  430:      return u16Data;
+  0067 9efe01   [5]             LDHX  1,SP
+  431:  }
+  006a a704     [2]             AIS   #4
+  006c 81       [6]             RTS   
+  432:  
+  433:  
+  434:  /*!
+  435:   * \brief RAMDrvWriteTx : Write a block of data to TX packet RAM, whichever is selected
+  436:   *
+  437:   * \param *psTxPkt - Packet to write
+  438:   *
+  439:   */
+  440:  void RAMDrvWriteTx(tTxPacket *psTxPkt)
+  441:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7fb     [2]             AIS   #-5
+  442:      UINT8 i, u8TempByte=0, u8TempValue=0;   /* Temporary counters */ 
+  0004 95       [2]             TSX   
+  0005 7f       [4]             CLR   ,X
+  443:      UINT8 u8MinLen=0;
+  444:  
+  445:      UINT16  u16Reg=0;                     /* TX packet length register value */
+  446:  
+  447:      if (gsPhyOptions.Bits.u1PromiscuousMode)
+  0006 c60001   [4]             LDA   gsPhyOptions:1
+  0009 a501     [2]             BIT   #1
+  000b 2704     [3]             BEQ   L11 ;abs = 0011
+  448:        u8MinLen = 3;
+  000d a603     [2]             LDA   #3
+  000f 2002     [3]             BRA   L13 ;abs = 0013
+  0011          L11:    
+  449:      else
+  450:        u8MinLen = 5;
+  0011 a605     [2]             LDA   #5
+  0013          L13:    
+  0013 e704     [3]             STA   4,X
+  451:  
+  452:      u16Reg = SPIDrvRead(TX_PKT_LEN);    /* 
+  0015 a603     [2]             LDA   #3
+  0017 cd0000   [6]             JSR   SPIDrvRead
+  001a 9eff03   [5]             STHX  3,SP
+  453:                                           * Read the TX packet length register 
+  454:                                           * contents 
+  455:                                           */
+  456:      u16Reg = (0xFF80 & u16Reg) | (psTxPkt->u8DataLength + (u8MinLen - 1)); /* 
+  001d 9efe06   [5]             LDHX  6,SP
+  0020 f6       [3]             LDA   ,X
+  0021 87       [2]             PSHA  
+  0022 9ee606   [4]             LDA   6,SP
+  0025 87       [2]             PSHA  
+  0026 8c       [1]             CLRH  
+  0027 88       [3]             PULX  
+  0028 afff     [2]             AIX   #-1
+  002a 9f       [1]             TXA   
+  002b 8b       [2]             PSHH  
+  002c 95       [2]             TSX   
+  002d eb01     [3]             ADD   1,X
+  002f e701     [3]             STA   1,X
+  0031 86       [3]             PULA  
+  0032 a900     [2]             ADC   #0
+  0034 87       [2]             PSHA  
+  0035 e605     [3]             LDA   5,X
+  0037 a480     [2]             AND   #-128
+  0039 ea01     [3]             ORA   1,X
+  003b e701     [3]             STA   1,X
+  003d e604     [3]             LDA   4,X
+  003f fa       [3]             ORA   ,X
+  0040 87       [2]             PSHA  
+  0041 ee01     [3]             LDX   1,X
+  0043 8a       [3]             PULH  
+  0044 9eff05   [5]             STHX  5,SP
+  457:                                                              * Mask out old 
+  458:                                                              * length setting and
+  459:                                                              * update. Add 2 for
+  460:                                                              * CRC and 2 for code bytes
+  461:                                                              */
+  462:      SPIDrvWrite(TX_PKT_LEN, u16Reg);    /* Update the TX packet length field */
+  0047 a603     [2]             LDA   #3
+  0049 cd0000   [6]             JSR   SPIDrvWrite
+  463:      SPIClearRecieveStatReg(&u8TempValue);/* Clear status register 
+  004c 95       [2]             TSX   
+  004d af02     [2]             AIX   #2
+  004f cd0000   [6]             JSR   SPIClearRecieveStatReg
+  464:                                           * (possible SPRF, SPTEF) 
+  465:                                           */
+  466:      SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0052 95       [2]             TSX   
+  0053 af02     [2]             AIX   #2
+  0055 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  467:                                   * Clear receive data register. SPI entirely
+  468:                                   * ready for read or write
+  469:                                   */                       
+  470:      MC13192DisableInterrupts(); /* Necessary to prevent double SPI access */
+  0058 cd0000   [6]             JSR   MC13192DisableInterrupts
+  471:      AssertCE();                 /* Enables MC13192 SPI */
+  005b cd0000   [6]             JSR   AssertCE
+  472:      SPISendChar(TX_PKT);        /* SPI TX ram data register */
+  005e a602     [2]             LDA   #2
+  0060 cd0000   [6]             JSR   SPISendChar
+  473:      SPIWaitTransferDone();      /* 
+  0063 cd0000   [6]             JSR   SPIWaitTransferDone
+  474:                                   * For this bit to be set, SPTED MUST be set. 
+  475:                                   * Now write content MSB 
+  476:                                   */
+  477:      SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0066 95       [2]             TSX   
+  0067 af02     [2]             AIX   #2
+  0069 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  478:                                   * Clear receive data register. SPI entirely 
+  479:                                   * ready for read or write
+  480:                                   */
+  481:      if (!gsPhyOptions.Bits.u1PromiscuousMode)
+  006c c60001   [4]             LDA   gsPhyOptions:1
+  006f a501     [2]             BIT   #1
+  0071 a702     [2]             AIS   #2
+  0073 2614     [3]             BNE   L89 ;abs = 0089
+  482:      {
+  483:        
+  484:        SPISendChar(0xFF);          /* Send 1st Code Byte */
+  0075 a6ff     [2]             LDA   #-1
+  0077 cd0000   [6]             JSR   SPISendChar
+  485:        SPIWaitTransferDone();      /* 
+  007a cd0000   [6]             JSR   SPIWaitTransferDone
+  486:                                     * For this bit to be set, SPTED MUST be set. 
+  487:                                     * Now write content MSB 
+  488:                                     */
+  489:        SPISendChar(0x7E);          /* Send 2nd Code Byte */
+  007d a67e     [2]             LDA   #126
+  007f cd0000   [6]             JSR   SPISendChar
+  490:        SPIWaitTransferDone();      /* 
+  0082 cd0000   [6]             JSR   SPIWaitTransferDone
+  491:                                     * For this bit to be set, SPTED MUST be set. 
+  492:                                     * Now write content MSB 
+  493:                                     */
+  494:        SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0085 95       [2]             TSX   
+  0086 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  0089          L89:    
+  495:                                     * Clear receive data register. SPI entirely 
+  496:                                     * ready for read or write
+  497:                                     */
+  498:      }
+  499:      u8TempByte = 0;             /* Byte counter for *contents */
+  500:      /* Word loop. Round up. */ 
+  501:      for (i=0; i<((psTxPkt->u8DataLength+1) >> 1); i++) { 
+  0089 9e6f02   [6]             CLR   2,SP
+  008c 4f       [1]             CLRA  
+  008d 204b     [3]             BRA   LDA ;abs = 00da
+  008f          L8F:    
+  502:          SPISendChar(psTxPkt->pu8Data[u8TempByte + 1]);  /* Write MSB */
+  008f 87       [2]             PSHA  
+  0090 8c       [1]             CLRH  
+  0091 9eee01   [4]             LDX   1,SP
+  0094 af01     [2]             AIX   #1
+  0096 89       [2]             PSHX  
+  0097 8b       [2]             PSHH  
+  0098 9efe09   [5]             LDHX  9,SP
+  009b 9ee602   [4]             LDA   2,SP
+  009e eb02     [3]             ADD   2,X
+  00a0 9ee702   [4]             STA   2,SP
+  00a3 86       [3]             PULA  
+  00a4 e901     [3]             ADC   1,X
+  00a6 87       [2]             PSHA  
+  00a7 8a       [3]             PULH  
+  00a8 88       [3]             PULX  
+  00a9 f6       [3]             LDA   ,X
+  00aa cd0000   [6]             JSR   SPISendChar
+  503:          SPIWaitTransferDone();  /* 
+  00ad cd0000   [6]             JSR   SPIWaitTransferDone
+  504:                                   * For this bit to be set, SPTED MUST be set. 
+  505:                                   * Now write content LSB 
+  506:                                   */
+  507:          SPIClearRecieveDataReg(&u8TempValue);/* 
+  00b0 95       [2]             TSX   
+  00b1 af01     [2]             AIX   #1
+  00b3 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  508:                                   * Clear receive data register. SPI entirely
+  509:                                   * ready for read or write
+  510:                                   */
+  511:          SPISendChar(psTxPkt->pu8Data[u8TempByte]);     /* Write LSB */          
+  00b6 9efe07   [5]             LDHX  7,SP
+  00b9 9ee601   [4]             LDA   1,SP
+  00bc eb02     [3]             ADD   2,X
+  00be 87       [2]             PSHA  
+  00bf 4f       [1]             CLRA  
+  00c0 e901     [3]             ADC   1,X
+  00c2 87       [2]             PSHA  
+  00c3 8a       [3]             PULH  
+  00c4 88       [3]             PULX  
+  00c5 f6       [3]             LDA   ,X
+  00c6 cd0000   [6]             JSR   SPISendChar
+  512:          u8TempByte = (UINT8)(u8TempByte + 2);           /* Increment byte counter */
+  00c9 86       [3]             PULA  
+  00ca ab02     [2]             ADD   #2
+  513:          SPIWaitTransferDone();  /* For this bit to be set, SPTED MUST be set.*/
+  00cc 87       [2]             PSHA  
+  00cd cd0000   [6]             JSR   SPIWaitTransferDone
+  514:          SPIClearRecieveDataReg(&u8TempValue);/* 
+  00d0 95       [2]             TSX   
+  00d1 af01     [2]             AIX   #1
+  00d3 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  00d6 9e6c03   [6]             INC   3,SP
+  00d9 86       [3]             PULA  
+  00da          LDA:    
+  00da 9efe06   [5]             LDHX  6,SP
+  00dd 87       [2]             PSHA  
+  00de f6       [3]             LDA   ,X
+  00df 87       [2]             PSHA  
+  00e0 8c       [1]             CLRH  
+  00e1 88       [3]             PULX  
+  00e2 af01     [2]             AIX   #1
+  00e4 8b       [2]             PSHH  
+  00e5 86       [3]             PULA  
+  00e6 47       [1]             ASRA  
+  00e7 56       [1]             RORX  
+  00e8 89       [2]             PSHX  
+  00e9 87       [2]             PSHA  
+  00ea 95       [2]             TSX   
+  00eb e604     [3]             LDA   4,X
+  00ed e001     [3]             SUB   1,X
+  00ef 4f       [1]             CLRA  
+  00f0 f2       [3]             SBC   ,X
+  00f1 a702     [2]             AIS   #2
+  00f3 cd0000   [6]             JSR   _PUSH_CC
+  00f6 e602     [3]             LDA   2,X
+  00f8 cd0000   [6]             JSR   _POP_CC
+  00fb 8a       [3]             PULH  
+  00fc 9191     [3]             BLT   L8F ;abs = 008f
+  515:                                   * Clear receive data register. SPI entirely 
+  516:                                   * ready for read or write
+  517:                                   */
+  518:      }
+  519:      DeAssertCE();                   /* Disables MC13192 SPI */
+  00fe cd0000   [6]             JSR   DeAssertCE
+  520:      MC13192RestoreInterrupts();     /* Restore MC13192 interrupt status */
+  0101 cd0000   [6]             JSR   MC13192RestoreInterrupts
+  521:  }
+  0104 a707     [2]             AIS   #7
+  0106 81       [6]             RTS   
+  522:  
+  523:  
+  524:  /*!
+  525:   * \brief RAMDrvReadRx : Read a block of data from RX packet RAM, whichever is selected
+  526:   *
+  527:   * \param *psRxPkt - Packet received
+  528:   *
+  529:   * \return u8Status
+  530:   */
+  531:  UINT8 RAMDrvReadRx(tRxPacket *psRxPkt)
+  532:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7f9     [2]             AIS   #-7
+  533:      UINT8 i, u8TempByte=0;        /* Temporary counters. */
+  534:      UINT8 u8MinLen=0;
+  535:      UINT8 u8TempValue=0;          /* 
+  0004 95       [2]             TSX   
+  0005 7f       [4]             CLR   ,X
+  536:                                   * Used by SPIClearRecieveDataReg to 
+  537:                                   * flush SPI1D register during read
+  538:                                   */
+  539:      UINT8  u8Status = 0;        /* Holder for the return value */
+  0006 6f06     [5]             CLR   6,X
+  540:      UINT16 u16RxLength;
+  541:      
+  542:      if (gsPhyOptions.Bits.u1PromiscuousMode)
+  0008 c60001   [4]             LDA   gsPhyOptions:1
+  000b a501     [2]             BIT   #1
+  000d 2704     [3]             BEQ   L13 ;abs = 0013
+  543:        u8MinLen = 3;
+  000f a603     [2]             LDA   #3
+  0011 2002     [3]             BRA   L15 ;abs = 0015
+  0013          L13:    
+  544:      else
+  545:        u8MinLen = 5;
+  0013 a605     [2]             LDA   #5
+  0015          L15:    
+  0015 e705     [3]             STA   5,X
+  546:    
+  547:      u16RxLength = SPIDrvRead(RX_PKT_LEN);   /* 
+  0017 a62d     [2]             LDA   #45
+  0019 cd0000   [6]             JSR   SPIDrvRead
+  001c 9eff02   [5]             STHX  2,SP
+  548:                                               * Read the RX packet length 
+  549:                                               * register contents 
+  550:                                               */
+  551:      u16RxLength &= 0x007F;          /* Mask out all but the RX packet length */
+  001f 95       [2]             TSX   
+  0020 e602     [3]             LDA   2,X
+  0022 a47f     [2]             AND   #127
+  0024 e702     [3]             STA   2,X
+  0026 6f01     [5]             CLR   1,X
+  552:  
+  553:      /* MC13192 reports length with 2 CRC bytes and 2 Code bytes,
+  554:       * remove them. 
+  555:       */
+  556:      if (u16RxLength >= u8MinLen) {
+  0028 ee05     [3]             LDX   5,X
+  002a 8c       [1]             CLRH  
+  002b 9ef302   [6]             CPHX  2,SP
+  002e 220c     [3]             BHI   L3C ;abs = 003c
+  557:          psRxPkt->u8DataLength = u16RxLength - (u8MinLen - 1); /*
+  0030 5a       [1]             DECX  
+  0031 89       [2]             PSHX  
+  0032 95       [2]             TSX   
+  0033 f0       [3]             SUB   ,X
+  0034 9efe09   [5]             LDHX  9,SP
+  0037 e701     [3]             STA   1,X
+  558:                                                    * Less byte code
+  559:                                                    * and CRC
+  560:                                                    */
+  561:      }
+  0039 8a       [3]             PULH  
+  003a 2005     [3]             BRA   L41 ;abs = 0041
+  003c          L3C:    
+  562:      else {
+  563:          psRxPkt->u8DataLength = 0;
+  003c 9efe08   [5]             LDHX  8,SP
+  003f 6f01     [5]             CLR   1,X
+  0041          L41:    
+  564:      }
+  565:          
+  566:      if ((psRxPkt->u8DataLength >= 1) && \
+  0041 9efe08   [5]             LDHX  8,SP
+  0044 6d01     [4]             TST   1,X
+  0046 2603     [3]             BNE   L4B ;abs = 004b
+  0048 cc012f   [4]             JMP   L12F ;abs = 012f
+  004b          L4B:    
+  004b f6       [3]             LDA   ,X
+  004c e101     [3]             CMP   1,X
+  004e 2403     [3]             BCC   L53 ;abs = 0053
+  0050 cc012f   [4]             JMP   L12F ;abs = 012f
+  0053          L53:    
+  567:          (psRxPkt->u8DataLength <= psRxPkt->u8MaxDataLength)) { /* 
+  568:                                                            * If <5, the packet 
+  569:                                                            * is garbage
+  570:                                                            */
+  571:          SPIClearRecieveStatReg(&u8TempValue);   /* Clear status register (SPRF, SPTEF) */  
+  0053 95       [2]             TSX   
+  0054 cd0000   [6]             JSR   SPIClearRecieveStatReg
+  572:          SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0057 95       [2]             TSX   
+  0058 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  573:                                       * Clear receive data register. 
+  574:                                       * SPI entirely ready for read or write
+  575:                                       */                       
+  576:          MC13192DisableInterrupts(); /* Necessary to prevent double SPI access */
+  005b cd0000   [6]             JSR   MC13192DisableInterrupts
+  577:          AssertCE();                 /* Enables MC13192 SPI */
+  005e cd0000   [6]             JSR   AssertCE
+  578:          SPISendChar(RX_PKT | 0x80); /* SPI RX ram data register */
+  0061 a681     [2]             LDA   #-127
+  0063 cd0000   [6]             JSR   SPISendChar
+  579:          SPIWaitTransferDone();      /* For this bit to be set, SPTED 
+  0066 cd0000   [6]             JSR   SPIWaitTransferDone
+  580:                                       * MUST be set.
+  581:                                       */
+  582:          SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0069 95       [2]             TSX   
+  006a cd0000   [6]             JSR   SPIClearRecieveDataReg
+  583:                                       * Clear receive data register. 
+  584:                                       * SPI entirely ready for read or write 
+  585:                                       */
+  586:          SPISendChar(u8TempValue);   /* 
+  006d 95       [2]             TSX   
+  006e f6       [3]             LDA   ,X
+  006f cd0000   [6]             JSR   SPISendChar
+  587:                                       * Dummy write. Receive register of SPI will 
+  588:                                       * contain MSB garbage for first read 
+  589:                                       */
+  590:          SPIWaitTransferDone();      /* For this bit to be set, SPTED MUST be set.*/
+  0072 cd0000   [6]             JSR   SPIWaitTransferDone
+  591:          SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0075 95       [2]             TSX   
+  0076 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  592:                                       * Clear receive data register. 
+  593:                                       * SPI entirely ready for read or write 
+  594:                                       */
+  595:          SPISendChar(u8TempValue);   /* 
+  0079 95       [2]             TSX   
+  007a f6       [3]             LDA   ,X
+  007b cd0000   [6]             JSR   SPISendChar
+  596:                                       * Dummy write. Receive register of SPI will 
+  597:                                       * contain LSB garbage for first read 
+  598:                                       */
+  599:          SPIWaitTransferDone();      /* For this bit to be set, SPTED MUST be set.*/
+  007e cd0000   [6]             JSR   SPIWaitTransferDone
+  600:          SPIClearRecieveDataReg(&u8TempValue);   /* 
+  0081 95       [2]             TSX   
+  0082 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  601:                                       * Clear receive data register. 
+  602:                                       * SPI entirely ready for read or write 
+  603:                                       */
+  604:          if (gsPhyOptions.Bits.u1PromiscuousMode == 0) 
+  0085 c60001   [4]             LDA   gsPhyOptions:1
+  0088 a501     [2]             BIT   #1
+  008a 2618     [3]             BNE   LA4 ;abs = 00a4
+  605:          {
+  606:            
+  607:                                        /* Byte codes */
+  608:            SPISendChar(u8TempValue);   /* 
+  008c 95       [2]             TSX   
+  008d f6       [3]             LDA   ,X
+  008e cd0000   [6]             JSR   SPISendChar
+  609:                                         * Dummy write. Receive register of SPI will 
+  610:                                         * contain LSB garbage for first read 
+  611:                                         */
+  612:            SPIWaitTransferDone();      /* For this bit to be set, SPTED MUST be set.*/
+  0091 cd0000   [6]             JSR   SPIWaitTransferDone
+  613:            u8TempValue = SPIRead();    /* Read first code byte */
+  0094 cd0000   [6]             JSR   SPIRead
+  0097 95       [2]             TSX   
+  0098 f7       [2]             STA   ,X
+  614:            SPISendChar(u8TempValue);   /* 
+  0099 cd0000   [6]             JSR   SPISendChar
+  615:                                         * Dummy write. Receive register of SPI will 
+  616:                                         * contain LSB garbage for first read 
+  617:                                         */
+  618:            SPIWaitTransferDone();      /* For this bit to be set, SPTED MUST be set.*/
+  009c cd0000   [6]             JSR   SPIWaitTransferDone
+  619:            u8TempValue = SPIRead();    /* Read second code byte */
+  009f cd0000   [6]             JSR   SPIRead
+  00a2 95       [2]             TSX   
+  00a3 f7       [2]             STA   ,X
+  00a4          LA4:    
+  620:  
+  621:          }
+  622:          u8TempByte = 0;             /* Byte counter for *contents */
+  00a4 95       [2]             TSX   
+  00a5 6f03     [5]             CLR   3,X
+  623:          /* Word loop. Round up. Deduct CRC. */
+  624:          for (i=0; i<((u16RxLength-1)>>1); i++) { 
+  00a7 6f04     [5]             CLR   4,X
+  00a9 205d     [3]             BRA   L108 ;abs = 0108
+  00ab          LAB:    
+  625:              SPISendChar(u8TempValue);/* 
+  00ab 95       [2]             TSX   
+  00ac f6       [3]             LDA   ,X
+  00ad cd0000   [6]             JSR   SPISendChar
+  626:                                       * Dummy write. Receive register of SPI 
+  627:                                       * will contain MSB
+  628:                                       */
+  629:              SPIWaitTransferDone();  /* 
+  00b0 cd0000   [6]             JSR   SPIWaitTransferDone
+  630:                                       * For this bit to be set, SPTED MUST be 
+  631:                                       * set. Get MSB
+  632:                                       */
+  633:              /* For a trailing garbage byte, just read and discard */
+  634:              if ((u8TempByte + 3) == u16RxLength) { 
+  00b3 9ee604   [4]             LDA   4,SP
+  00b6 8c       [1]             CLRH  
+  00b7 97       [1]             TAX   
+  00b8 af03     [2]             AIX   #3
+  00ba 9ef302   [6]             CPHX  2,SP
+  00bd 2606     [3]             BNE   LC5 ;abs = 00c5
+  635:                  SPIClearRecieveDataReg(&u8TempValue);                  /* Discard */
+  00bf 95       [2]             TSX   
+  00c0 cd0000   [6]             JSR   SPIClearRecieveDataReg
+  636:              }
+  00c3 201f     [3]             BRA   LE4 ;abs = 00e4
+  00c5          LC5:    
+  637:              else {
+  638:                  psRxPkt->pu8Data[u8TempByte + 1] = SPIRead();   /* Read MSB */
+  00c5 8c       [1]             CLRH  
+  00c6 97       [1]             TAX   
+  00c7 af01     [2]             AIX   #1
+  00c9 9f       [1]             TXA   
+  00ca 8b       [2]             PSHH  
+  00cb 9efe09   [5]             LDHX  9,SP
+  00ce eb03     [3]             ADD   3,X
+  00d0 87       [2]             PSHA  
+  00d1 9ee602   [4]             LDA   2,SP
+  00d4 e902     [3]             ADC   2,X
+  00d6 9ee702   [4]             STA   2,SP
+  00d9 cd0000   [6]             JSR   SPIRead
+  00dc 9eee02   [4]             LDX   2,SP
+  00df 89       [2]             PSHX  
+  00e0 8a       [3]             PULH  
+  00e1 88       [3]             PULX  
+  00e2 f7       [2]             STA   ,X
+  00e3 8a       [3]             PULH  
+  00e4          LE4:    
+  639:              }
+  640:              SPISendChar(u8TempValue);/*
+  00e4 95       [2]             TSX   
+  00e5 f6       [3]             LDA   ,X
+  00e6 cd0000   [6]             JSR   SPISendChar
+  641:                                       * Dummy write. Receive register of SPI 
+  642:                                       * will contain LSB
+  643:                                       */
+  644:              SPIWaitTransferDone();  /* 
+  00e9 cd0000   [6]             JSR   SPIWaitTransferDone
+  645:                                       * For this bit to be set, SPTED MUST be
+  646:                                       * set. Get LSB
+  647:                                       */
+  648:              psRxPkt->pu8Data[u8TempByte] = SPIRead();   /* Read LSB */
+  00ec 9efe08   [5]             LDHX  8,SP
+  00ef 9ee604   [4]             LDA   4,SP
+  00f2 eb03     [3]             ADD   3,X
+  00f4 87       [2]             PSHA  
+  00f5 4f       [1]             CLRA  
+  00f6 e902     [3]             ADC   2,X
+  00f8 87       [2]             PSHA  
+  00f9 cd0000   [6]             JSR   SPIRead
+  00fc 8a       [3]             PULH  
+  00fd 88       [3]             PULX  
+  00fe f7       [2]             STA   ,X
+  649:              u8TempByte = (UINT8)(u8TempByte + 2);       /* Increment byte counter */
+  00ff 95       [2]             TSX   
+  0100 e603     [3]             LDA   3,X
+  0102 ab02     [2]             ADD   #2
+  0104 e703     [3]             STA   3,X
+  0106 6c04     [5]             INC   4,X
+  0108          L108:   
+  0108 9efe02   [5]             LDHX  2,SP
+  010b afff     [2]             AIX   #-1
+  010d 8b       [2]             PSHH  
+  010e 86       [3]             PULA  
+  010f 44       [1]             LSRA  
+  0110 56       [1]             RORX  
+  0111 87       [2]             PSHA  
+  0112 89       [2]             PSHX  
+  0113 86       [3]             PULA  
+  0114 88       [3]             PULX  
+  0115 87       [2]             PSHA  
+  0116 89       [2]             PSHX  
+  0117 95       [2]             TSX   
+  0118 e606     [3]             LDA   6,X
+  011a e001     [3]             SUB   1,X
+  011c 4f       [1]             CLRA  
+  011d f2       [3]             SBC   ,X
+  011e a702     [2]             AIS   #2
+  0120 2589     [3]             BCS   LAB ;abs = 00ab
+  650:          }
+  651:          DeAssertCE();               /* Disables MC13192 SPI */
+  0122 cd0000   [6]             JSR   DeAssertCE
+  652:          psRxPkt->u8Status = SUCCESS;
+  0125 9efe08   [5]             LDHX  8,SP
+  0128 a677     [2]             LDA   #119
+  012a e704     [3]             STA   4,X
+  653:          MC13192RestoreInterrupts(); /* Restore MC13192 interrupt status */
+  012c cd0000   [6]             JSR   MC13192RestoreInterrupts
+  012f          L12F:   
+  654:      }
+  655:      /* Check to see if a larger packet than desired is received. */  
+  656:      if (psRxPkt->u8DataLength > psRxPkt->u8MaxDataLength) {
+  012f 9efe08   [5]             LDHX  8,SP
+  0132 f6       [3]             LDA   ,X
+  0133 e101     [3]             CMP   1,X
+  0135 2404     [3]             BCC   L13B ;abs = 013b
+  657:          psRxPkt->u8Status = OVERFLOW;
+  0137 a601     [2]             LDA   #1
+  0139 e704     [3]             STA   4,X
+  013b          L13B:   
+  658:      }
+  659:      return u8Status;  
+  013b 9ee607   [4]             LDA   7,SP
+  660:  }
+  013e a709     [2]             AIS   #9
+  0140 81       [6]             RTS   
+  661:  
+  662:  

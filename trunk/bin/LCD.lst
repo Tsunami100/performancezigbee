@@ -1,0 +1,583 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /**
+    2:   * Copyright (c) 2004, Freescale Semiconductor
+    3:   * Freescale Confidential Proprietary
+    4:   *
+    5:   * File name :  LCD.c
+    6:   * Project name: SMAC (Simple Media Access Controller)
+    7:   *
+    8:   * Department : Freescale Radio Products Division
+    9:   *
+   10:   * Description : LCD functions
+   11:   *
+   12:   * $Author: rgd04c $
+   13:   * $Date: 2006/09/25 14:47:08 $
+   14:   * $Name:  $
+   15:   */
+   16:  /* File: LCD.c */
+   17:  
+   18:  
+   19:  
+   20:  #include "LCD.h"
+   21:  #include <string.h>
+   22:  #include "freescale_radio_hardware.h"
+   23:  
+   24:  #if (LCD_ENABLED)
+   25:  void LCDFirstLine( void )
+   26:  {
+   27:      /*  Setup the R/W for writing (PTGD), Initialize EN and RS to 0   */
+   28:  
+   29:      LCD_RW = 0;     
+  0000 1700     [5]             BCLR  3,_PTBD
+   30:      LCD_REG_SEL = 0;     
+  0002 1300     [5]             BCLR  1,_PTBD
+   31:   
+   32:  
+   33:      /* DD Ram Address Set - 1st Digit */
+   34:      LCDWrite4bits(0x80);
+  0004 a680     [2]             LDA   #-128
+  0006 cd0000   [6]             JSR   LCDWrite4bits
+   35:      LCDToggleEN();
+  0009 cd0000   [6]             JSR   LCDToggleEN
+   36:      LCDWaitShort(1);
+  000c a601     [2]             LDA   #1
+  000e cd0000   [6]             JSR   LCDWaitShort
+   37:      LCDWrite4bits(0x00);
+  0011 4f       [1]             CLRA  
+  0012 cd0000   [6]             JSR   LCDWrite4bits
+   38:      LCDToggleEN();
+  0015 cd0000   [6]             JSR   LCDToggleEN
+   39:      LCDWaitShort(4);
+  0018 a604     [2]             LDA   #4
+  001a cc0000   [4]             JMP   LCDWaitShort
+   40:  }
+   41:  
+   42:  void LCDSecondLine(void)
+   43:  {
+   44:      /* Setup the R/W for writing (PTGD), Initialize EN and RS to 0  */    
+   45:  
+   46:      LCD_RW = 0;
+  0000 1700     [5]             BCLR  3,_PTBD
+   47:      LCD_REG_SEL = 0;     
+  0002 1300     [5]             BCLR  1,_PTBD
+   48:  
+   49:      /* DD Ram Address Set - 1st Digit */
+   50:      LCDWrite4bits(0xC0);
+  0004 a6c0     [2]             LDA   #-64
+  0006 cd0000   [6]             JSR   LCDWrite4bits
+   51:      LCDToggleEN();
+  0009 cd0000   [6]             JSR   LCDToggleEN
+   52:      LCDWaitShort(1);
+  000c a601     [2]             LDA   #1
+  000e cd0000   [6]             JSR   LCDWaitShort
+   53:      LCDWrite4bits(0x00);
+  0011 4f       [1]             CLRA  
+  0012 cd0000   [6]             JSR   LCDWrite4bits
+   54:      LCDToggleEN();
+  0015 cd0000   [6]             JSR   LCDToggleEN
+   55:      LCDWaitShort(4);
+  0018 a604     [2]             LDA   #4
+  001a cc0000   [4]             JMP   LCDWaitShort
+   56:  }
+   57:  
+   58:  void LCDClearDisplay(void)
+   59:  {
+   60:      /* Setup the R/W for writing (PTGD), Initialize EN and RS to 0 */
+   61:      LCD_REG_SEL = 0;
+  0000 1300     [5]             BCLR  1,_PTBD
+   62:      LCD_RW = 0; 
+  0002 1700     [5]             BCLR  3,_PTBD
+   63:    
+   64:      LCDWrite4bits(0x00);
+  0004 4f       [1]             CLRA  
+  0005 cd0000   [6]             JSR   LCDWrite4bits
+   65:      LCDToggleEN();
+  0008 cd0000   [6]             JSR   LCDToggleEN
+   66:      LCDWaitShort(1);
+  000b a601     [2]             LDA   #1
+  000d cd0000   [6]             JSR   LCDWaitShort
+   67:      LCDWrite4bits(0x10);
+  0010 a610     [2]             LDA   #16
+  0012 cd0000   [6]             JSR   LCDWrite4bits
+   68:      LCDToggleEN();
+  0015 cd0000   [6]             JSR   LCDToggleEN
+   69:      LCDWaitLong(3);
+  0018 ae03     [2]             LDX   #3
+  001a 8c       [1]             CLRH  
+  001b cc0000   [4]             JMP   LCDWaitLong
+   70:  }
+   71:  
+   72:  void LCDWaitLong(UINT16 w)
+   73:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7fc     [2]             AIS   #-4
+   74:      UINT16 x;
+   75:      UINT16 y;
+   76:        
+   77:      for ( y = 0; y < w; y++ )
+  0004 95       [2]             TSX   
+  0005 6f01     [5]             CLR   1,X
+  0007 7f       [4]             CLR   ,X
+  0008 201a     [3]             BRA   L24 ;abs = 0024
+  000a          LA:     
+   78:      {
+   79:          for ( x = 0; x < 0x7FF; x++ );
+  000a 95       [2]             TSX   
+  000b 6f03     [5]             CLR   3,X
+  000d 6f02     [5]             CLR   2,X
+  000f          LF:     
+  000f 95       [2]             TSX   
+  0010 6c03     [5]             INC   3,X
+  0012 2602     [3]             BNE   L16 ;abs = 0016
+  0014 6c02     [5]             INC   2,X
+  0016          L16:    
+  0016 9efe03   [5]             LDHX  3,SP
+  0019 6507ff   [3]             CPHX  #2047
+  001c 25f1     [3]             BCS   LF ;abs = 000f
+  001e 95       [2]             TSX   
+  001f 6c01     [5]             INC   1,X
+  0021 2601     [3]             BNE   L24 ;abs = 0024
+  0023 7c       [4]             INC   ,X
+  0024          L24:    
+  0024 9efe05   [5]             LDHX  5,SP
+  0027 9ef301   [6]             CPHX  1,SP
+  002a 22de     [3]             BHI   LA ;abs = 000a
+   80:      }
+   81:  }
+  002c a706     [2]             AIS   #6
+  002e 81       [6]             RTS   
+   82:  
+   83:  void LCDWaitShort(UINT8 w )
+   84:  {
+  0000 87       [2]             PSHA  
+  0001 8b       [2]             PSHH  
+   85:      UINT8 x;
+   86:      UINT8 y;
+   87:        
+   88:      for ( y = 0; y < w; y++ )
+  0002 95       [2]             TSX   
+  0003 7f       [4]             CLR   ,X
+  0004 2008     [3]             BRA   LE ;abs = 000e
+  0006          L6:     
+   89:      {
+   90:          for ( x = 0; x < 0xFF; x++ );
+  0006 4f       [1]             CLRA  
+  0007          L7:     
+  0007 4c       [1]             INCA  
+  0008 a1ff     [2]             CMP   #-1
+  000a 25fb     [3]             BCS   L7 ;abs = 0007
+  000c 95       [2]             TSX   
+  000d 7c       [4]             INC   ,X
+  000e          LE:     
+  000e e601     [3]             LDA   1,X
+  0010 f1       [3]             CMP   ,X
+  0011 22f3     [3]             BHI   L6 ;abs = 0006
+   91:      }
+   92:  }
+  0013 a702     [2]             AIS   #2
+  0015 81       [6]             RTS   
+   93:  
+   94:  void LCDToggleEN( void )
+   95:  {
+   96:  
+   97:  LCD_EN = 1;
+  0000 1400     [5]             BSET  2,_PTBD
+   98:  LCD_EN = 0; 
+  0002 1500     [5]             BCLR  2,_PTBD
+   99:  
+  100:  }
+  0004 81       [6]             RTS   
+  101:  
+  102:  void LCDInit(void)
+  103:  {
+  104:      LCDWaitLong(5);
+  0000 ae05     [2]             LDX   #5
+  0002 8c       [1]             CLRH  
+  0003 ad00     [5]             BSR   LCDWaitLong
+  105:    
+  106:    
+  107:      LCD_INIT_MACRO;
+  0005 6eff00   [4]             MOV   #-1,_PTBDD
+  108:      
+  109:    
+  110:      /* Initialize data port */
+  111:      
+  112:      LCD_DATA1 = 0;
+  0008 1900     [5]             BCLR  4,_PTBD
+  113:      LCD_DATA2 = 0;
+  000a 1b00     [5]             BCLR  5,_PTBD
+  114:      LCD_DATA3 = 0;
+  000c 1d00     [5]             BCLR  6,_PTBD
+  115:      LCD_DATA4 = 0;// PTBD = PTBD & 0x0F;    
+  000e 1f00     [5]             BCLR  7,_PTBD
+  116:  
+  117:      /* Setup the R/W for writing (PTBD) */
+  118:      
+  119:      LCD_RW = 0; 
+  0010 1700     [5]             BCLR  3,_PTBD
+  120:  
+  121:      /* Initialize EN and RS to 0 */
+  122:      
+  123:      LCD_REG_SEL = 0;
+  0012 1300     [5]             BCLR  1,_PTBD
+  124:      LCD_EN = 0;
+  0014 1500     [5]             BCLR  2,_PTBD
+  125:      
+  126:      /* Send the reset sequence */
+  127:      LCDWrite4bits(0x30);
+  0016 a630     [2]             LDA   #48
+  0018 cd0000   [6]             JSR   LCDWrite4bits
+  128:      LCDToggleEN();
+  001b ad00     [5]             BSR   LCDToggleEN
+  129:        
+  130:      LCDWaitLong(5);
+  001d ae05     [2]             LDX   #5
+  001f 8c       [1]             CLRH  
+  0020 ad00     [5]             BSR   LCDWaitLong
+  131:    
+  132:      LCDWrite4bits(0x30);
+  0022 a630     [2]             LDA   #48
+  0024 cd0000   [6]             JSR   LCDWrite4bits
+  133:      LCDToggleEN();
+  0027 ad00     [5]             BSR   LCDToggleEN
+  134:    
+  135:      LCDWaitShort(2);
+  0029 a602     [2]             LDA   #2
+  002b ad00     [5]             BSR   LCDWaitShort
+  136:    
+  137:      LCDWrite4bits(0x30);
+  002d a630     [2]             LDA   #48
+  002f cd0000   [6]             JSR   LCDWrite4bits
+  138:      LCDToggleEN();
+  0032 ad00     [5]             BSR   LCDToggleEN
+  139:    
+  140:      LCDWaitShort(2);
+  0034 a602     [2]             LDA   #2
+  0036 ad00     [5]             BSR   LCDWaitShort
+  141:  
+  142:      LCDWrite4bits(0x20);
+  0038 a620     [2]             LDA   #32
+  003a cd0000   [6]             JSR   LCDWrite4bits
+  143:      LCDToggleEN();
+  003d ad00     [5]             BSR   LCDToggleEN
+  144:    
+  145:      LCDWaitShort(1);
+  003f a601     [2]             LDA   #1
+  0041 ad00     [5]             BSR   LCDWaitShort
+  146:    
+  147:      /* Function, 4 bit data length */
+  148:      LCDWrite4bits(0x20);
+  0043 a620     [2]             LDA   #32
+  0045 cd0000   [6]             JSR   LCDWrite4bits
+  149:      LCDToggleEN();
+  0048 ad00     [5]             BSR   LCDToggleEN
+  150:    
+  151:      LCDWaitShort(1);
+  004a a601     [2]             LDA   #1
+  004c ad00     [5]             BSR   LCDWaitShort
+  152:    
+  153:      /*  2 lines, 5x7 dot format  */
+  154:      LCDWrite4bits(0x80);
+  004e a680     [2]             LDA   #-128
+  0050 cd0000   [6]             JSR   LCDWrite4bits
+  155:      LCDToggleEN();
+  0053 ad00     [5]             BSR   LCDToggleEN
+  156:    
+  157:      LCDWaitShort(4);
+  0055 a604     [2]             LDA   #4
+  0057 ad00     [5]             BSR   LCDWaitShort
+  158:    
+  159:      // Entry Mode Inc, No Shift
+  160:      LCDWrite4bits(0x00);
+  0059 4f       [1]             CLRA  
+  005a cd0000   [6]             JSR   LCDWrite4bits
+  161:      LCDToggleEN();
+  005d ad00     [5]             BSR   LCDToggleEN
+  162:      LCDWaitShort(1);
+  005f a601     [2]             LDA   #1
+  0061 cd0000   [6]             JSR   LCDWaitShort
+  163:      LCDWrite4bits(0x60);
+  0064 a660     [2]             LDA   #96
+  0066 cd0000   [6]             JSR   LCDWrite4bits
+  164:      LCDToggleEN();
+  0069 ad00     [5]             BSR   LCDToggleEN
+  165:      LCDWaitShort(5);
+  006b a605     [2]             LDA   #5
+  006d cd0000   [6]             JSR   LCDWaitShort
+  166:    
+  167:      // Display ON/OFF Control - Display On, Cursor Off, Blink Off
+  168:      LCDWrite4bits(0x00);
+  0070 4f       [1]             CLRA  
+  0071 cd0000   [6]             JSR   LCDWrite4bits
+  169:      LCDToggleEN();
+  0074 ad00     [5]             BSR   LCDToggleEN
+  170:      LCDWaitShort(1);
+  0076 a601     [2]             LDA   #1
+  0078 cd0000   [6]             JSR   LCDWaitShort
+  171:      LCDWrite4bits(0xC0);
+  007b a6c0     [2]             LDA   #-64
+  007d cd0000   [6]             JSR   LCDWrite4bits
+  172:      LCDToggleEN();
+  0080 cd0000   [6]             JSR   LCDToggleEN
+  173:      LCDWaitShort(5);
+  0083 a605     [2]             LDA   #5
+  0085 cd0000   [6]             JSR   LCDWaitShort
+  174:    
+  175:      // Display Clear
+  176:      LCDClearDisplay();
+  0088 cc0000   [4]             JMP   LCDClearDisplay
+  177:    
+  178:      //LCDFirstLine();
+  179:  }
+  180:  
+  181:  void LCDWrite4bits(UINT8 bdata)
+  182:  {
+  183:      if (bdata & 0x80)
+  0000 4d       [1]             TSTA  
+  0001 2a04     [3]             BPL   L7 ;abs = 0007
+  184:      {
+  185:          LCD_DATA4 = 1;//PTBD = PTBD | bdata; 
+  0003 1e00     [5]             BSET  7,_PTBD
+  186:      }
+  0005 2002     [3]             BRA   L9 ;abs = 0009
+  0007          L7:     
+  187:      else
+  188:      {
+  189:          LCD_DATA4 = 0;//PTBD = PTBD & 0x7F; 
+  0007 1f00     [5]             BCLR  7,_PTBD
+  0009          L9:     
+  190:      }
+  191:          
+  192:      if (bdata & 0x40)
+  0009 a540     [2]             BIT   #64
+  000b 2704     [3]             BEQ   L11 ;abs = 0011
+  193:      {
+  194:          LCD_DATA3 = 1;//PTBD = PTBD | bdata; 
+  000d 1c00     [5]             BSET  6,_PTBD
+  195:      }
+  000f 2002     [3]             BRA   L13 ;abs = 0013
+  0011          L11:    
+  196:        else
+  197:      {
+  198:          LCD_DATA3 = 0;//PTBD = PTBD & 0xBF; 
+  0011 1d00     [5]             BCLR  6,_PTBD
+  0013          L13:    
+  199:      }
+  200:          
+  201:      if (bdata & 0x20)
+  0013 a520     [2]             BIT   #32
+  0015 2704     [3]             BEQ   L1B ;abs = 001b
+  202:      {
+  203:          LCD_DATA2 = 1;//PTBD = PTBD | bdata; 
+  0017 1a00     [5]             BSET  5,_PTBD
+  204:      }
+  0019 2002     [3]             BRA   L1D ;abs = 001d
+  001b          L1B:    
+  205:      else
+  206:      {
+  207:          LCD_DATA2 = 0;//PTBD = PTBD & 0xDF; 
+  001b 1b00     [5]             BCLR  5,_PTBD
+  001d          L1D:    
+  208:  
+  209:      }
+  210:          
+  211:      if (bdata & 0x10)
+  001d a510     [2]             BIT   #16
+  001f 2704     [3]             BEQ   L25 ;abs = 0025
+  212:      {
+  213:          LCD_DATA1 = 1;//PTBD = PTBD | bdata; 
+  0021 1800     [5]             BSET  4,_PTBD
+  214:      }
+  0023 2002     [3]             BRA   L27 ;abs = 0027
+  0025          L25:    
+  215:      else
+  216:      {
+  217:          LCD_DATA1 = 0;//PTBD = PTBD & 0xEF; 
+  0025 1900     [5]             BCLR  4,_PTBD
+  0027          L27:    
+  218:      }
+  219:  }
+  0027 81       [6]             RTS   
+  220:  
+  221:  void LCDWriteCommand(UINT8 cmd)
+  222:  {
+  223:      
+  224:      LCD_RW = 0;
+  0000 1700     [5]             BCLR  3,_PTBD
+  225:      LCD_REG_SEL = 0;
+  0002 1300     [5]             BCLR  1,_PTBD
+  226:      LCD_EN = 0; 
+  0004 1500     [5]             BCLR  2,_PTBD
+  227:  
+  228:      LCDWrite4bits(cmd);  /* cmd bits 4-7 */
+  0006 87       [2]             PSHA  
+  0007 ad00     [5]             BSR   LCDWrite4bits
+  229:    
+  230:      LCDToggleEN();
+  0009 cd0000   [6]             JSR   LCDToggleEN
+  231:  
+  232:      LCDWrite4bits(cmd << 4);  /* cmd bits 0-3 */
+  000c 86       [3]             PULA  
+  000d 62       [1]             NSA   
+  000e a4f0     [2]             AND   #-16
+  0010 ad00     [5]             BSR   LCDWrite4bits
+  233:      
+  234:      LCDToggleEN();
+  0012 cd0000   [6]             JSR   LCDToggleEN
+  235:    
+  236:      LCDWaitLong(5);
+  0015 ae05     [2]             LDX   #5
+  0017 8c       [1]             CLRH  
+  0018 cc0000   [4]             JMP   LCDWaitLong
+  237:  }
+  238:  
+  239:  
+  240:  void LCDWriteString(UINT8 line, UINT8 *str)
+  241:  {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 8b       [2]             PSHH  
+  242:      UINT8 len;
+  243:      UINT8 x;
+  244:    
+  245:      if (line == 2)
+  0003 a102     [2]             CMP   #2
+  0005 2605     [3]             BNE   LC ;abs = 000c
+  246:          LCDSecondLine();
+  0007 cd0000   [6]             JSR   LCDSecondLine
+  000a 2003     [3]             BRA   LF ;abs = 000f
+  000c          LC:     
+  247:      else
+  248:          LCDFirstLine();
+  000c cd0000   [6]             JSR   LCDFirstLine
+  000f          LF:     
+  249:    
+  250:      len = (UINT8)strlen(str);
+  000f 9efe02   [5]             LDHX  2,SP
+  0012 cd0000   [6]             JSR   strlen
+  0015 9eef01   [4]             STX   1,SP
+  251:  
+  252:      /* Check boundries  */
+  253:      if (len > MAX_LCD_CHARS)
+  0018 a310     [2]             CPX   #16
+  001a 2304     [3]             BLS   L20 ;abs = 0020
+  254:          len = MAX_LCD_CHARS;
+  001c a610     [2]             LDA   #16
+  001e 95       [2]             TSX   
+  001f f7       [2]             STA   ,X
+  0020          L20:    
+  255:        
+  256:      for (x = 0; x < len; x++)
+  0020 4f       [1]             CLRA  
+  0021 2011     [3]             BRA   L34 ;abs = 0034
+  0023          L23:    
+  257:      {
+  258:          LCDWriteChar(str[x]);
+  0023 87       [2]             PSHA  
+  0024 95       [2]             TSX   
+  0025 eb03     [3]             ADD   3,X
+  0027 87       [2]             PSHA  
+  0028 4f       [1]             CLRA  
+  0029 e902     [3]             ADC   2,X
+  002b 87       [2]             PSHA  
+  002c 8a       [3]             PULH  
+  002d 88       [3]             PULX  
+  002e f6       [3]             LDA   ,X
+  002f cd0000   [6]             JSR   LCDWriteChar
+  0032 86       [3]             PULA  
+  0033 4c       [1]             INCA  
+  0034          L34:    
+  0034 95       [2]             TSX   
+  0035 f1       [3]             CMP   ,X
+  0036 240a     [3]             BCC   L42 ;abs = 0042
+  0038 20e9     [3]             BRA   L23 ;abs = 0023
+  003a          L3A:    
+  259:      }
+  260:    
+  261:      /* Clear the rest of the line */
+  262:      for (; x < 16; x++)
+  263:      {
+  264:          LCDWriteChar(' ');
+  003a 87       [2]             PSHA  
+  003b a620     [2]             LDA   #32
+  003d cd0000   [6]             JSR   LCDWriteChar
+  0040 86       [3]             PULA  
+  0041 4c       [1]             INCA  
+  0042          L42:    
+  0042 a110     [2]             CMP   #16
+  0044 25f4     [3]             BCS   L3A ;abs = 003a
+  265:      }
+  266:  }
+  0046 a703     [2]             AIS   #3
+  0048 81       [6]             RTS   
+  267:  
+  268:  void LCDWriteChar(UINT8 ch)
+  269:  {
+  270:      
+  271:      LCD_RW = 0;
+  0000 1700     [5]             BCLR  3,_PTBD
+  272:      LCD_EN = 0;
+  0002 1500     [5]             BCLR  2,_PTBD
+  273:      LCD_REG_SEL = 1;
+  0004 1200     [5]             BSET  1,_PTBD
+  274:        
+  275:      LCDWrite4bits(ch);
+  0006 87       [2]             PSHA  
+  0007 cd0000   [6]             JSR   LCDWrite4bits
+  276:      
+  277:      LCDToggleEN();
+  000a cd0000   [6]             JSR   LCDToggleEN
+  278:        
+  279:      LCDWrite4bits(ch << 4);
+  000d 86       [3]             PULA  
+  000e 62       [1]             NSA   
+  000f a4f0     [2]             AND   #-16
+  0011 cd0000   [6]             JSR   LCDWrite4bits
+  280:        
+  281:      LCDToggleEN();
+  0014 cd0000   [6]             JSR   LCDToggleEN
+  282:        
+  283:      LCDWaitShort(2);
+  0017 a602     [2]             LDA   #2
+  0019 cc0000   [4]             JMP   LCDWaitShort
+  284:  }
+  285:  
+  286:  #else
+  287:  void LCDInit(void)
+  288:  {
+  289:    
+  290:  }
+  291:  
+  292:  void LCDWrite4bits(UINT8 bdata)
+  293:  {
+  294:    (void) bdata;
+  295:  }
+  296:  
+  297:  void LCDFirstLine(void)
+  298:  {
+  299:    
+  300:  }
+  301:  
+  302:  void LCDSecondLine(void)
+  303:  {
+  304:    
+  305:  }
+  306:  
+  307:  void LCDClearDisplay(void)
+  308:  {
+  309:    
+  310:  }
+  311:  
+  312:  void LCDWriteString(UINT8 line, UINT8 *str)
+  313:  {
+  314:    (void) line;
+  315:    (void) str[0];
+  316:  }
+  317:  
+  318:  void LCDWriteChar(UINT8 ch)
+  319:  {
+  320:    (void) ch;
+  321:  }
+  322:  #endif

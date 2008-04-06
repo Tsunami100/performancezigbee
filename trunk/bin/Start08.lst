@@ -1,0 +1,369 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /******************************************************************************
+    2:    FILE        : start08.c
+    3:    PURPOSE     : 68HC08 standard startup code
+    4:    LANGUAGE    : ANSI-C / INLINE ASSEMBLER
+    5:    ----------------------------------------------------------------------------
+    6:    HISTORY
+    7:      22 oct 93         Created.
+    8:      04/17/97          Also C++ constructors called in Init().
+    9:   ******************************************************************************/
+   10:  
+   11:  /**********************************************************************/
+   12:  /* NOTE:                                                              */
+   13:  /* This version of the startup code assumes that main                 */
+   14:  /* does never return (saving the 2 byte return address of _Startup on */
+   15:  /* the stack).                                                        */
+   16:  /**********************************************************************/
+   17:  
+   18:  #define __NO_FLAGS_OFFSET   /* we do not need the flags field in the startup data descriptor */
+   19:  #define __NO_MAIN_OFFSET    /* we do not need the main field in the startup data descriptor */
+   20:  
+   21:  #include <start08.h>
+   22:  
+   23:  /***************************************************************************/
+   24:  /* Macros to control how the startup code handles the COP:                 */
+   25:  /* #define _DO_FEED_COP_   : do feed the COP                               */
+   26:  /* Without defining any of these, the startup code does NOT handle the COP */
+   27:  /***************************************************************************/
+   28:  /* __ONLY_INIT_SP define:                                                  */
+   29:  /* This define selects an shorter version of the startup code              */
+   30:  /* which only loads the stack pointer and directly afterwards calls        */
+   31:  /* main. This version does however NOT initialize global variables         */
+   32:  /* (so this version is not ANSI compliant!).                               */
+   33:  /***************************************************************************/
+   34:  
+   35:  #ifdef __cplusplus
+   36:  #define __EXTERN_C  extern "C"
+   37:  #else
+   38:  #define __EXTERN_C
+   39:  #endif
+   40:  
+   41:  #if defined(_DO_FEED_COP_)
+   42:  #define __FEED_COP_IN_HLI()  } _FEED_COP(); __asm {
+   43:  #else
+   44:  #define __FEED_COP_IN_HLI() /* do nothing */
+   45:  #endif
+   46:  
+   47:  #ifndef __ONLY_INIT_SP
+   48:  
+   49:  #pragma DATA_SEG FAR _STARTUP
+   50:  struct _tagStartup _startupData;    /* read-only:
+   51:                                       _startupData is allocated in ROM and
+   52:                                       initialized by the linker */
+   53:  
+   54:  #pragma MESSAGE DISABLE C20001 /* Warning C20001: Different value of stackpointer depending on control-flow */
+   55:  /* the function _COPY_L releases some bytes from the stack internally */
+   56:  
+   57:  #if defined(__OPTIMIZE_FOR_SIZE__) || defined(_DO_FEED_COP_)
+   58:  #pragma NO_ENTRY
+   59:  #pragma NO_EXIT
+   60:  #pragma NO_FRAME
+   61:  /*lint -esym(528, loadByte) inhibit warning about unreferenced loadByte function */
+   62:  static void near loadByte(void) {
+   63:    asm {
+   64:               PSHH
+   65:               PSHX
+   66:  #ifdef __HCS08__
+   67:               LDHX    5,SP
+   68:               LDA     0,X
+   69:               AIX     #1
+   70:               STHX    5,SP
+   71:  #else
+   72:               LDA     5,SP
+   73:               PSHA
+   74:               LDX     7,SP
+   75:               PULH
+   76:               LDA     0,X
+   77:               AIX     #1
+   78:               STX     6,SP
+   79:               PSHH
+   80:               PULX
+   81:               STX     5,SP
+   82:  #endif
+   83:               PULX
+   84:               PULH
+   85:               RTS
+   86:    }
+   87:  }
+   88:  #endif /* defined(__OPTIMIZE_FOR_SIZE__) || defined(_DO_FEED_COP_) */
+   89:  
+   90:  
+   91:  /*lint -esym(752,_COPY_L)  inhibit message on function declared, but not used (it is used in HLI) */
+   92:  __EXTERN_C extern void _COPY_L(void);
+   93:  /* DESC:    copy very large structures (>= 256 bytes) in 16-bit address space (stack incl.)
+   94:     IN:      TOS count, TOS(2) @dest, H:X @src
+   95:     OUT:
+   96:     WRITTEN: X,H */
+   97:  #ifdef __ELF_OBJECT_FILE_FORMAT__
+   98:  	#define toCopyDownBegOffs 0
+   99:  #else
+  100:  	#define toCopyDownBegOffs 2 /* for the hiware format, the toCopyDownBeg field is a long. Because the HC08 is big endian, we have to use an offset of 2 */
+  101:  #endif
+  102:  static void Init(void) {
+  0000 a7fc     [2]             AIS   #-4
+  103:  /* purpose:     1) zero out RAM-areas where data is allocated
+  104:                  2) init run-time data
+  105:                  3) copy initialization data from ROM to RAM
+  106:   */
+  107:    /*lint -esym(529,p,i)  inhibit warning about symbols not used: it is used in HLI below */
+  108:    int i;
+  109:    int *far p;
+  110:  
+  111:    asm {
+  112:  ZeroOut:
+  113:               LDA    _startupData.nofZeroOuts:1 ; // nofZeroOuts
+  0002 c60001   [4]             LDA   _startupData:1
+  114:               INCA
+  0005 4c       [1]             INCA  
+  0006 95       [2]             TSX   
+  115:               STA    i:1                        ; // i is counter for number of zero outs
+  0007 e701     [3]             STA   1,X
+  116:               LDA    _startupData.nofZeroOuts:0 ; // nofZeroOuts
+  0009 c60000   [4]             LDA   _startupData
+  117:               INCA
+  000c 4c       [1]             INCA  
+  118:               STA    i:0
+  000d f7       [2]             STA   ,X
+  119:               LDHX   _startupData.pZeroOut      ; // *pZeroOut
+  000e 320002   [5]             LDHX  _startupData:2
+  120:               BRA    Zero_5
+  0011 201f     [3]             BRA   L32 ;abs = 0032
+  0013          L13:    
+  121:  Zero_3:
+  122:               ; // CLR    i:1 is already 0
+  123:  Zero_4:
+  124:               ; // { HX == _pZeroOut }
+  125:               PSHX
+  0013 89       [2]             PSHX  
+  126:               PSHH
+  0014 8b       [2]             PSHH  
+  127:               ; // { nof bytes in (int)2,X }
+  128:               ; // { address in (int)0,X   }
+  129:               LDA    0,X
+  0015 f6       [3]             LDA   ,X
+  130:               PSHA
+  0016 87       [2]             PSHA  
+  131:               LDA    2,X
+  0017 e602     [3]             LDA   2,X
+  132:               INCA
+  0019 4c       [1]             INCA  
+  133:               STA    p                 ; // p:0 is used for high byte of byte counter
+  001a 9ee706   [4]             STA   6,SP
+  134:               LDA    3,X
+  001d e603     [3]             LDA   3,X
+  135:               LDX    1,X
+  001f ee01     [3]             LDX   1,X
+  136:               PULH
+  0021 8a       [3]             PULH  
+  137:               INCA
+  0022 4c       [1]             INCA  
+  138:               BRA    Zero_0
+  0023 2003     [3]             BRA   L28 ;abs = 0028
+  0025          L25:    
+  139:  Zero_1:
+  140:             ;  // CLRA   A is already 0, so we do not have to clear it
+  141:  Zero_2:
+  142:               CLR    0,X
+  0025 7f       [4]             CLR   ,X
+  143:               AIX    #1
+  0026 af01     [2]             AIX   #1
+  0028          L28:    
+  144:               __FEED_COP_IN_HLI()     	; // it's necessary to feed the COP in the inner loop for the fast COP timeout of some derivatives
+  145:  Zero_0:
+  146:               DBNZA  Zero_2
+  0028 4bfb     [4]             DBNZA L25 ;abs = 0025
+  147:  Zero_6:
+  148:               DBNZ   p, Zero_1
+  002a 9e6b05f7 [8]             DBNZ  5,SP,L25 ;abs = 0025
+  149:               PULH
+  002e 8a       [3]             PULH  
+  150:               PULX                     ; // restore *pZeroOut
+  002f 88       [3]             PULX  
+  151:               AIX    #4                ; // advance *pZeroOut
+  0030 af04     [2]             AIX   #4
+  0032          L32:    
+  152:  Zero_5:
+  153:               DBNZ   i:1, Zero_4
+  0032 9e6b02dd [8]             DBNZ  2,SP,L13 ;abs = 0013
+  154:               DBNZ   i:0, Zero_3
+  0036 9e6b01d9 [8]             DBNZ  1,SP,L13 ;abs = 0013
+  155:  
+  156:  CopyDown:
+  157:  
+  158:    }
+  159:  
+  160:    /* copy down */
+  161:    /* _startupData.toCopyDownBeg  --->  {nof(16) dstAddr(16) {bytes(8)}^nof} Zero(16) */
+  162:  #if defined(__OPTIMIZE_FOR_SIZE__) || defined(_DO_FEED_COP_) /* for now: only -os version supports _DO_FEED_COP_ */
+  163:    asm {
+  164:  #ifdef __HCS08__
+  165:               LDHX   _startupData.toCopyDownBeg:toCopyDownBegOffs
+  166:               PSHX
+  167:               PSHH
+  168:  #else
+  169:               LDA    _startupData.toCopyDownBeg:(1+toCopyDownBegOffs)
+  170:               PSHA
+  171:               LDA    _startupData.toCopyDownBeg:(0+toCopyDownBegOffs)
+  172:               PSHA
+  173:  #endif
+  174:  Loop0:
+  175:               JSR    loadByte          ; // load high byte counter
+  176:               TAX                      ; // save for compare
+  177:               INCA
+  178:               STA    i
+  179:               JSR    loadByte          ; // load low byte counter
+  180:               INCA
+  181:               STA    i:1
+  182:               DECA
+  183:               BNE    notfinished
+  184:               CBEQX  #0, finished
+  185:  notfinished:
+  186:  
+  187:               JSR    loadByte          ; // load high byte ptr
+  188:               PSHA
+  189:               PULH
+  190:               JSR    loadByte          ; // load low byte ptr
+  191:               TAX                      ; // HX is now destination pointer
+  192:               BRA    Loop1
+  193:  Loop3:
+  194:  Loop2:
+  195:               __FEED_COP_IN_HLI()
+  196:               JSR    loadByte          ; // load data byte
+  197:               STA    0,X
+  198:               AIX    #1
+  199:  Loop1:
+  200:               DBNZ   i:1, Loop2
+  201:               DBNZ   i:0, Loop3
+  202:               BRA    Loop0
+  203:  
+  204:  finished:
+  205:               AIS #2
+  206:      }
+  207:  #else /*defined(__OPTIMIZE_FOR_SIZE__) || defined(_DO_FEED_COP_) */
+  208:    /* time optimized asm version. */
+  209:    asm {
+  210:  #ifdef __HCS08__
+  211:               LDHX   _startupData.toCopyDownBeg:toCopyDownBegOffs
+  003a 320004   [5]             LDHX  _startupData:4
+  003d          L3D:    
+  212:  #else
+  213:               LDX    _startupData.toCopyDownBeg:(0+toCopyDownBegOffs)
+  214:               PSHX
+  215:               PULH
+  216:               LDX    _startupData.toCopyDownBeg:(1+toCopyDownBegOffs)
+  217:  #endif
+  218:  next:
+  219:               LDA   0,X                ; // list is terminated by 2 zero bytes
+  003d f6       [3]             LDA   ,X
+  220:               ORA   1,X
+  003e ea01     [3]             ORA   1,X
+  221:               BEQ   copydone
+  0040 2722     [3]             BEQ   L64 ;abs = 0064
+  222:               PSHX                     ; // store current position
+  0042 89       [2]             PSHX  
+  223:               PSHH
+  0043 8b       [2]             PSHH  
+  224:               LDA   3,X                ; // psh dest low
+  0044 e603     [3]             LDA   3,X
+  225:               PSHA
+  0046 87       [2]             PSHA  
+  226:               LDA   2,X                ; // psh dest high
+  0047 e602     [3]             LDA   2,X
+  227:               PSHA
+  0049 87       [2]             PSHA  
+  228:               LDA   1,X                ; // psh cnt low
+  004a e601     [3]             LDA   1,X
+  229:               PSHA
+  004c 87       [2]             PSHA  
+  230:               LDA   0,X                ; // psh cnt high
+  004d f6       [3]             LDA   ,X
+  231:               PSHA
+  004e 87       [2]             PSHA  
+  232:               AIX   #4
+  004f af04     [2]             AIX   #4
+  233:               JSR   _COPY_L            ; // copy one block
+  0051 cd0000   [6]             JSR   _COPY_L
+  234:               PULH
+  0054 8a       [3]             PULH  
+  235:               PULX
+  0055 88       [3]             PULX  
+  236:               TXA
+  0056 9f       [1]             TXA   
+  237:               ADD   1,X                ; // add low
+  0057 eb01     [3]             ADD   1,X
+  238:               PSHA
+  0059 87       [2]             PSHA  
+  239:               PSHH
+  005a 8b       [2]             PSHH  
+  240:               PULA
+  005b 86       [3]             PULA  
+  241:               ADC   0,X                ; // add high
+  005c f9       [3]             ADC   ,X
+  242:               PSHA
+  005d 87       [2]             PSHA  
+  243:               PULH
+  005e 8a       [3]             PULH  
+  244:               PULX
+  005f 88       [3]             PULX  
+  245:               AIX   #4
+  0060 af04     [2]             AIX   #4
+  246:               BRA next
+  0062 20d9     [3]             BRA   L3D ;abs = 003d
+  0064          L64:    
+  247:  copydone:
+  248:    }
+  249:  #endif /* defined(__OPTIMIZE_FOR_SIZE__) || defined(_DO_FEED_COP_) */
+  250:  
+  251:    /* FuncInits: for C++, this are the global constructors */
+  252:  #ifdef __cplusplus
+  253:  #ifdef __ELF_OBJECT_FILE_FORMAT__
+  254:    i = (int)(_startupData.nofInitBodies - 1);
+  255:    while (i >= 0) {
+  256:      (&_startupData.initBodies->initFunc)[i]();  /* call C++ constructors */
+  257:      i--;
+  258:    }
+  259:  #else /* __ELF_OBJECT_FILE_FORMAT__ */
+  260:    /* HIWARE object file format */
+  261:    if (_startupData.mInits != NULL) {
+  262:      _PFunc *fktPtr;
+  263:      fktPtr = _startupData.mInits;
+  264:      while(*fktPtr != NULL) {
+  265:        (**fktPtr)(); /* call constructor */
+  266:        fktPtr++;
+  267:      }
+  268:    }
+  269:  #endif /* __ELF_OBJECT_FILE_FORMAT__ */
+  270:  #endif /* __cplusplus */
+  271:  
+  272:    /* implement ROM libraries initialization here (see startup.c) */
+  273:  }
+  0064 a704     [2]             AIS   #4
+  0066 81       [6]             RTS   
+  274:  #endif /* __ONLY_INIT_SP */
+  275:  
+  276:  __EXTERN_C extern void main(void); /* prototype of main function */
+  277:  
+  278:  #pragma NO_EXIT
+  279:  __EXTERN_C void _Startup(void) {
+  280:  /* set the reset vector to _Startup in the linker parameter file (*.prm):
+  281:      'VECTOR 0 _Startup'
+  282:  
+  283:      purpose:    1)  initialize the stack
+  284:                  2)  initialize run-time, ...
+  285:                      initialize the RAM, copy down init data, etc (Init)
+  286:                  3)  call main;
+  287:      called from: _PRESTART-code generated by the Linker
+  288:  */
+  289:    INIT_SP_FROM_STARTUP_DESC();
+  0000 450000   [3]             LDHX  @__SEG_END_SSTACK
+  0003 94       [2]             TXS   
+  290:  #ifndef  __ONLY_INIT_SP
+  291:    Init();
+  0004 ad00     [5]             BSR   Init
+  292:  #endif
+  293:    __asm JMP main; /* with a C style main(); we would push the return address on the stack wasting 2 RAM bytes */
+  0006 cc0000   [4]             JMP   main
+  294:  }
+  295:  
