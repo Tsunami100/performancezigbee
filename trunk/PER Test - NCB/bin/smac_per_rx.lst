@@ -1,0 +1,2102 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  /****************************************************************************
+    2:  application rx_per.c
+    3:  
+    4:  Author: MOTOROLA
+    5:  
+    6:  Application Note: 
+    7:  RX_per waits for a ZigBee packet to be received.
+    8:  Then the link quality of the ZigBee packet is measured by reading the link quality register.
+    9:  A comparison is made between SPEC_POWER L1_POWER, L2_POWER, and L3_POWER.
+   10:  From this comparison a ACK packet is formed {'A','C','K', x = {0,1,2,3}} where x represents the respective power settings.
+   11:  After the ACK is sent the RADIO returns to RX forever mode.
+   12:  ****************************************************************************/
+   13:  
+   14:  #include <hidef.h> /* for EnableInterrupts macro */
+   15:  #include "pub_def.h"
+   16:  #include "LCD.h"
+   17:  #include "SCI.h"
+   18:  #include "APP_SMAC_API.h"
+   19:  #include "freescale_radio_hardware.h"
+   20:  #include "smac_per_rx.h"
+   21:  #include "eventDefs.h"
+   22:  #include "timer.h"
+   23:  #include "ledFunctions.h"
+   24:  #include <string.h>
+   25:  #include "kbi.h"
+   26:  #include "ascii_utilities.h"
+   27:  #if (EMBEDDED_BOOTLOADER == TRUE)  
+   28:  #include "bootloader user api.h"
+   29:  #endif
+   30:  
+   31:  #if SMAC_FEATURE_OTAP == TRUE
+   32:  #include "APP_OTAP_API.h"
+   33:  #endif // SMAC_FEATURE_OTAP == TRUE
+   34:  
+   35:  #if SMAC_FEATURE_SECURITY == TRUE
+   36:  #include "APP_security_API.h"
+   37:  #endif // SMAC_FEATURE_SECURITY == TRUE
+   38:  
+   39:  /* Global Variables */
+   40:  byte gu8RTxMode; /* needed for s-mac, application can read this variable */
+   41:  				/* rtx_mode is the software state variable of the radio */
+   42:  				/* This variable reflects the current state of MC13192 */
+   43:  int app_status = 0;	//State machine variable for the application	
+   44:  byte led_status = 0;	//led status reflects which power setting should be set.
+   45:  UINT8 link_quality;	//Holds the link quality of the last received ZigBee Packet.
+   46:  extern char SCIdata[2];
+   47:  extern int SCIdata_flag;
+   48:  UINT8 gu8Channel = CHANNEL_NUMBER;
+   49:  UINT16 gu16Events = 0;
+   50:  UINT8 expectedString[30];
+   51:  extern UINT16 gu16msTimer;
+   52:  extern UINT16 gu16timerEvent[2];
+   53:  
+   54:  UINT32 packet_count = 0;
+   55:  UINT32 packet_number = 0;
+   56:  UINT32 packet_size = 0;
+   57:  UINT32 packet_interval = 0;
+   58:  UINT32 packet_repeat = 0;
+   59:  UINT32 packet_power = 0;
+   60:  
+   61:  UINT32 packet_histogramy[10];
+   62:  
+   63:  UINT32 opcao;
+   64:  
+   65:  	
+   66:  void main(void) {
+  0000 a79b     [2]             AIS   #-101
+   67:  
+   68:     tRxPacket rx_packet;	//SMAC structure for RX packets
+   69:     tTxPacket tx_packet;	//SMAC structure for TX packets
+   70:     byte rx_data_buffer[20];	//Data buffer to hold RX data, if you want larger packets change 20 to what you need.
+   71:     byte tx_data_buffer[20];	//Data buffer to hold TX data, if you want larger packets change 20 to what you need.
+   72:     UINT32 loop, i;
+   73:     UINT8 quantidadePkt[10];
+   74:     UINT8 tamanhoPkt[5];
+   75:     UINT8 intervaloPkt[5];
+   76:     UINT8 repetirPkt[5];
+   77:     UINT8 opcaoStr[2];
+   78:     
+   79:     UINT8 potenciaPkt[5];
+   80:     
+   81:  
+   82:     char App_String[10];
+   83:  	
+   84:  	//EnableInterrupts; /* enable interrupts */
+   85:  	/* include your code here */
+   86:  	/* Init LED's */
+   87:  
+   88:  
+   89:  
+   90:  	//Initialize the packet.
+   91:    tx_packet.u8DataLength = 0;		//Set TX default length to 0
+  0002 9e6f0c   [6]             CLR   12,SP
+   92:    tx_packet.pu8Data = &tx_data_buffer[0];	//Load the address of our txbuffer into the tx structure
+  0005 95       [2]             TSX   
+  0006 af3b     [2]             AIX   #59
+  0008 9eff0d   [5]             STHX  13,SP
+   93:    rx_packet.u8DataLength = 0;		//Set RX default length to 0
+  000b 9e6f10   [6]             CLR   16,SP
+   94:    rx_packet.pu8Data = &rx_data_buffer[0];	//Load the address of our rxbuffer into the rx structure
+  000e af16     [2]             AIX   #22
+  0010 9eff11   [5]             STHX  17,SP
+   95:    rx_packet.u8MaxDataLength = 128;		//Define the max buffer we are interested in.
+  0013 a680     [2]             LDA   #-128
+  0015 95       [2]             TSX   
+  0016 e70e     [3]             STA   14,X
+   96:    rx_packet.u8Status = 0;					//initial status variable for rx to 0.
+  0018 6f12     [5]             CLR   18,X
+   97:    MCUInit();			//Initialize the mcu, setup GPIOs, SPI, clock scheme, etc.
+  001a cd0000   [6]             JSR   MCUInit
+   98:    RadioInit();
+  001d cd0000   [6]             JSR   RadioInit
+   99:    
+  100:    app_init();
+  0020 cd0000   [6]             JSR   app_init
+  101:  	SCIInitGeneric(8000000, 38400, DEFAULT_SCI_PORT);	
+  0023 451200   [3]             LDHX  #4608
+  0026 89       [2]             PSHX  
+  0027 8b       [2]             PSHH  
+  0028 ae7a     [2]             LDX   #122
+  002a 8c       [1]             CLRH  
+  002b 89       [2]             PSHX  
+  002c 8b       [2]             PSHH  
+  002d 459600   [3]             LDHX  #-27136
+  0030 89       [2]             PSHX  
+  0031 8b       [2]             PSHH  
+  0032 89       [2]             PSHX  
+  0033 89       [2]             PSHX  
+  0034 a601     [2]             LDA   #1
+  0036 cd0000   [6]             JSR   SCIInitGeneric
+  0039 a708     [2]             AIS   #8
+  102:     KBIInit();
+  003b cd0000   [6]             JSR   KBIInit
+  103:     
+  104:     KBI_ENABLEINTERRUPTS;
+  003e 1200     [5]             BSET  1,_KBI1SC
+  105:     
+  106:  	(void)MLMESetMC13192ClockRate(0);  /* Set initial Clk speed */
+  0040 4f       [1]             CLRA  
+  0041 cd0000   [6]             JSR   MLMESetMC13192ClockRate
+  107:  	UseExternalClock();	/* switch clock sources */
+  0044 cd0000   [6]             JSR   UseExternalClock
+  108:  	
+  109:  	
+  110:  	/* include your start up code here */	
+  111:    EnableInterrupts; /* Turn on system interrupts */
+  0047 9a       [1]             CLI   
+  112:  	(void)MLMESetChannelRequest(CHANNEL_NUMBER);	//Set channel to 0 (2.405GHz)		
+  0048 a60f     [2]             LDA   #15
+  004a cd0000   [6]             JSR   MLMESetChannelRequest
+  113:  
+  114:  #if (EMBEDDED_BOOTLOADER == TRUE)
+  115:    boot_init();  //Initialize the bootloader...in bootloader user api.c
+  116:  #endif
+  117:  
+  118:    /******************************************************************
+  119:    To adjust output power call the MLMEMC13192PAOutputAdjust() with:
+  120:    
+  121:    MAX_POWER     (+3 to +5dBm)
+  122:    NOMINAL_POWER (0 dBm)
+  123:    MIN_POWER     ~(-16dBm)
+  124:    
+  125:    or somewhere custom ? (0-15, 11 (NOMINAL_POWER) being Default power)
+  126:  
+  127:  	******************************************************************/
+  128:  	//MLMEMC13192PAOutputAdjust(MAX_POWER);	//Set MAX power setting
+  129:    //MLMEMC13192PAOutputAdjust(MIN_POWER);	//Set MIN power setting
+  130:    (void)MLMEMC13192PAOutputAdjust(OUTPUT_POWER);	//Set Nominal power setting	
+  004d a60b     [2]             LDA   #11
+  004f cd0000   [6]             JSR   MLMEMC13192PAOutputAdjust
+  131:  
+  132:  
+  133:  	#if (EMBEDDED_BOOTLOADER == TRUE)
+  134:        boot_call();  //Checks for user request for bootloader.
+  135:                      //Runs bootloader if requested.  Code will not return.
+  136:    #endif
+  137:  
+  138:    #if LCD_ENABLED
+  139:      LCDInit(); /* Optional LCD display initialization */
+  0052 cd0000   [6]             JSR   LCDInit
+  140:      LCDClearDisplay();
+  0055 cd0000   [6]             JSR   LCDClearDisplay
+  141:    #endif
+  142:     /* Indicate RX radio out of reset */
+  143:     setLedsMode(LED_HEX_MODE, 0xF, 30, LED_NO_FLAGS);
+  0058 a601     [2]             LDA   #1
+  005a 87       [2]             PSHA  
+  005b ae0f     [2]             LDX   #15
+  005d 8c       [1]             CLRH  
+  005e 89       [2]             PSHX  
+  005f 8b       [2]             PSHH  
+  0060 58       [1]             LSLX  
+  0061 4f       [1]             CLRA  
+  0062 cd0000   [6]             JSR   setLedsMode
+  0065 a703     [2]             AIS   #3
+  144:     setLedsMode(LED_HEX_MODE, 0xF, 30, LED_NO_FLAGS);
+  0067 a601     [2]             LDA   #1
+  0069 87       [2]             PSHA  
+  006a a60f     [2]             LDA   #15
+  006c 87       [2]             PSHA  
+  006d 4f       [1]             CLRA  
+  006e 87       [2]             PSHA  
+  006f ae1e     [2]             LDX   #30
+  0071 8c       [1]             CLRH  
+  0072 cd0000   [6]             JSR   setLedsMode
+  0075 a703     [2]             AIS   #3
+  145:     
+  146:     /* Set up the expected string */
+  147:     for (loop=0; loop<20; loop++) {
+  0077 5f       [1]             CLRX  
+  0078 8c       [1]             CLRH  
+  0079 9eff06   [5]             STHX  6,SP
+  007c 8c       [1]             CLRH  
+  007d 9eff04   [5]             STHX  4,SP
+  0080          L80:    
+  148:        expectedString[loop] = (UINT8)loop;
+  0080 9eee07   [4]             LDX   7,SP
+  0083 8c       [1]             CLRH  
+  0084 9f       [1]             TXA   
+  0085 d70000   [4]             STA   @expectedString,X
+  0088 95       [2]             TSX   
+  0089 af03     [2]             AIX   #3
+  008b cd0000   [6]             JSR   _LINC
+  008e cd0000   [6]             JSR   _POP32
+  0091 9efe04   [5]             LDHX  4,SP
+  0094 2608     [3]             BNE   L9E ;abs = 009e
+  0096 9efe06   [5]             LDHX  6,SP
+  0099 650014   [3]             CPHX  #20
+  009c 25e2     [3]             BCS   L80 ;abs = 0080
+  009e          L9E:    
+  149:     }
+  150:     expectedString[20] = '\0'; /* Terminate the string */
+  009e 4f       [1]             CLRA  
+  009f c70014   [4]             STA   expectedString:20
+  151:     
+  152:  	
+  153:  	app_status = INITIAL_STATE;
+  00a2 ae01     [2]             LDX   #1
+  00a4 8c       [1]             CLRH  
+  00a5 960000   [5]             STHX  app_status
+  154:  	
+  155:  	SCITransmitStr("\n\n\n\r\rFirmware para testes.\n\r");
+  00a8 450000   [3]             LDHX  @"\012\012\012\015\015Firmware para testes.\012\015"
+  00ab cd0000   [6]             JSR   SCITransmitStr
+  156:  	SCITransmitStr("\rOperando no canal ");
+  00ae 450000   [3]             LDHX  @"\015Operando no canal "
+  00b1 cd0000   [6]             JSR   SCITransmitStr
+  157:    (void)int2string((UINT32) gu8Channel, App_String);
+  00b4 c60000   [4]             LDA   gu8Channel
+  00b7 87       [2]             PSHA  
+  00b8 4f       [1]             CLRA  
+  00b9 87       [2]             PSHA  
+  00ba 87       [2]             PSHA  
+  00bb 87       [2]             PSHA  
+  00bc 95       [2]             TSX   
+  00bd af17     [2]             AIX   #23
+  00bf cd0000   [6]             JSR   int2string
+  00c2 a704     [2]             AIS   #4
+  158:  	(void)trimWhiteSpace(App_String);
+  00c4 95       [2]             TSX   
+  00c5 af13     [2]             AIX   #19
+  00c7 cd0000   [6]             JSR   trimWhiteSpace
+  159:  	SCITransmitStr(App_String);	
+  00ca 95       [2]             TSX   
+  00cb af13     [2]             AIX   #19
+  00cd cd0000   [6]             JSR   SCITransmitStr
+  160:  	SCITransmitStr("\n\r");        	      
+  00d0 450000   [3]             LDHX  @"\012\015"
+  00d3 cd0000   [6]             JSR   SCITransmitStr
+  161:  		
+  162:    #if LCD_ENABLED
+  163:      LCDWriteString( 1, "Firmware TESTE" );
+  00d6 a601     [2]             LDA   #1
+  00d8 450000   [3]             LDHX  @"Firmware TESTE"
+  00db cd0000   [6]             JSR   LCDWriteString
+  164:      LCDWriteString( 2, "802.15.4" );
+  00de a602     [2]             LDA   #2
+  00e0 450000   [3]             LDHX  @"802.15.4"
+  00e3 cd0000   [6]             JSR   LCDWriteString
+  165:    #endif
+  166:    
+  167:    
+  168:    
+  169:  	//Loop forever
+  170:  	for (;;) {
+  00e6 cc0a44   [4]             JMP   LA44 ;abs = 0a44
+  00e9          LE9:    
+  171:  	
+  172:  	   
+  173:  	   
+  174:  
+  175:  		/* include your regular code here */
+  176:  		switch (app_status) {
+  00e9 320000   [5]             LDHX  app_status
+  00ec 65000f   [3]             CPHX  #15
+  00ef 9055     [3]             BGE   L146 ;abs = 0146
+  00f1 650006   [3]             CPHX  #6
+  00f4 9028     [3]             BGE   L11E ;abs = 011e
+  00f6 650004   [3]             CPHX  #4
+  00f9 9013     [3]             BGE   L10E ;abs = 010e
+  00fb 650001   [3]             CPHX  #1
+  00fe 2603     [3]             BNE   L103 ;abs = 0103
+  0100 cc019a   [4]             JMP   L19A ;abs = 019a
+  0103          L103:   
+  0103 650002   [3]             CPHX  #2
+  0106 2603     [3]             BNE   L10B ;abs = 010b
+  0108 cc0a07   [4]             JMP   LA07 ;abs = 0a07
+  010b          L10B:   
+  010b cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  010e          L10E:   
+  010e 2603     [3]             BNE   L113 ;abs = 0113
+  0110 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  0113          L113:   
+  0113 650005   [3]             CPHX  #5
+  0116 2603     [3]             BNE   L11B ;abs = 011b
+  0118 cc0597   [4]             JMP   L597 ;abs = 0597
+  011b          L11B:   
+  011b cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  011e          L11E:   
+  011e 65000d   [3]             CPHX  #13
+  0121 9013     [3]             BGE   L136 ;abs = 0136
+  0123 650006   [3]             CPHX  #6
+  0126 2603     [3]             BNE   L12B ;abs = 012b
+  0128 cc0817   [4]             JMP   L817 ;abs = 0817
+  012b          L12B:   
+  012b 650008   [3]             CPHX  #8
+  012e 2603     [3]             BNE   L133 ;abs = 0133
+  0130 cc082b   [4]             JMP   L82B ;abs = 082b
+  0133          L133:   
+  0133 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  0136          L136:   
+  0136 2603     [3]             BNE   L13B ;abs = 013b
+  0138 cc090f   [4]             JMP   L90F ;abs = 090f
+  013b          L13B:   
+  013b 65000e   [3]             CPHX  #14
+  013e 2603     [3]             BNE   L143 ;abs = 0143
+  0140 cc04ea   [4]             JMP   L4EA ;abs = 04ea
+  0143          L143:   
+  0143 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  0146          L146:   
+  0146 650014   [3]             CPHX  #20
+  0149 902d     [3]             BGE   L178 ;abs = 0178
+  014b 650012   [3]             CPHX  #18
+  014e 9018     [3]             BGE   L168 ;abs = 0168
+  0150 65000f   [3]             CPHX  #15
+  0153 2603     [3]             BNE   L158 ;abs = 0158
+  0155 cc0320   [4]             JMP   L320 ;abs = 0320
+  0158          L158:   
+  0158 650010   [3]             CPHX  #16
+  015b 2603     [3]             BNE   L160 ;abs = 0160
+  015d cc04d8   [4]             JMP   L4D8 ;abs = 04d8
+  0160          L160:   
+  0160 650011   [3]             CPHX  #17
+  0163 2772     [3]             BEQ   L1D7 ;abs = 01d7
+  0165 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  0168          L168:   
+  0168 2603     [3]             BNE   L16D ;abs = 016d
+  016a cc02fb   [4]             JMP   L2FB ;abs = 02fb
+  016d          L16D:   
+  016d 650013   [3]             CPHX  #19
+  0170 2603     [3]             BNE   L175 ;abs = 0175
+  0172 cc02d6   [4]             JMP   L2D6 ;abs = 02d6
+  0175          L175:   
+  0175 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  0178          L178:   
+  0178 650016   [3]             CPHX  #22
+  017b 9013     [3]             BGE   L190 ;abs = 0190
+  017d 650014   [3]             CPHX  #20
+  0180 2603     [3]             BNE   L185 ;abs = 0185
+  0182 cc07bf   [4]             JMP   L7BF ;abs = 07bf
+  0185          L185:   
+  0185 650015   [3]             CPHX  #21
+  0188 2603     [3]             BNE   L18D ;abs = 018d
+  018a cc06ea   [4]             JMP   L6EA ;abs = 06ea
+  018d          L18D:   
+  018d cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  0190          L190:   
+  0190 277f     [3]             BEQ   L211 ;abs = 0211
+  0192 650017   [3]             CPHX  #23
+  0195 277f     [3]             BEQ   L216 ;abs = 0216
+  0197 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  019a          L19A:   
+  177:  			case INITIAL_STATE:
+  178:  			
+  179:  				  // Estado inicial
+  180:  				
+  181:  				  LED1 = LED_ON; LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_ON;		//All LEDs On
+  019a 1900     [5]             BCLR  4,_PTDD
+  019c 1b00     [5]             BCLR  5,_PTDD
+  019e 1d00     [5]             BCLR  6,_PTDD
+  01a0 1f00     [5]             BCLR  7,_PTDD
+  182:  		      delaySeconds(1);
+  01a2 ae01     [2]             LDX   #1
+  01a4 8c       [1]             CLRH  
+  01a5 cd0000   [6]             JSR   delaySeconds
+  183:  
+  184:  				  LED1 = LED_OFF; LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_OFF; //All LEDs Off
+  01a8 1800     [5]             BSET  4,_PTDD
+  01aa 1a00     [5]             BSET  5,_PTDD
+  01ac 1c00     [5]             BSET  6,_PTDD
+  01ae 1e00     [5]             BSET  7,_PTDD
+  185:  		      delaySeconds(1);
+  01b0 ae01     [2]             LDX   #1
+  01b2 8c       [1]             CLRH  
+  01b3 cd0000   [6]             JSR   delaySeconds
+  186:  
+  187:  				  LED1 = LED_ON; LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_ON;		//All LEDs On
+  01b6 1900     [5]             BCLR  4,_PTDD
+  01b8 1b00     [5]             BCLR  5,_PTDD
+  01ba 1d00     [5]             BCLR  6,_PTDD
+  01bc 1f00     [5]             BCLR  7,_PTDD
+  188:  		      delaySeconds(1);
+  01be ae01     [2]             LDX   #1
+  01c0 8c       [1]             CLRH  
+  01c1 cd0000   [6]             JSR   delaySeconds
+  189:  
+  190:  				  LED1 = LED_OFF; LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_OFF;	//All LEDs Off
+  01c4 1800     [5]             BSET  4,_PTDD
+  01c6 1a00     [5]             BSET  5,_PTDD
+  01c8 1c00     [5]             BSET  6,_PTDD
+  01ca 1e00     [5]             BSET  7,_PTDD
+  191:  		      delaySeconds(1);
+  01cc ae01     [2]             LDX   #1
+  01ce 8c       [1]             CLRH  
+  01cf cd0000   [6]             JSR   delaySeconds
+  192:  
+  193:  				  app_status = SELECT_FIRMWARE;
+  01d2 ae11     [2]             LDX   #17
+  194:  
+  195:  				break;
+  01d4 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  01d7          L1D7:   
+  196:  		  case SELECT_FIRMWARE:
+  197:  		      
+  198:            SCITransmitStr("\r\nSelecione qual firmware sera utilizado:\r\n");
+  01d7 450000   [3]             LDHX  @"\015\012Selecione qual firmware sera utilizado:\015\012"
+  01da cd0000   [6]             JSR   SCITransmitStr
+  199:            SCITransmitStr("\r\n[1] Portadora modulada\r\n");
+  01dd 450000   [3]             LDHX  @"\015\012[1] Portadora modulada\015\012"
+  01e0 cd0000   [6]             JSR   SCITransmitStr
+  200:            SCITransmitStr("\r\n[2] Portadora nao modulada\r\n");
+  01e3 450000   [3]             LDHX  @"\015\012[2] Portadora nao modulada\015\012"
+  01e6 cd0000   [6]             JSR   SCITransmitStr
+  201:            SCITransmitStr("\r\n[3] Transmissor\r\n");
+  01e9 450000   [3]             LDHX  @"\015\012[3] Transmissor\015\012"
+  01ec cd0000   [6]             JSR   SCITransmitStr
+  202:            SCITransmitStr("\r\n[4] Receptor\r\n");
+  01ef 450000   [3]             LDHX  @"\015\012[4] Receptor\015\012"
+  01f2 cd0000   [6]             JSR   SCITransmitStr
+  203:            (void)SCIgets("\r\nOpcao:", &opcaoStr[0],2);
+  01f5 450000   [3]             LDHX  @"\015\012Opcao:"
+  01f8 89       [2]             PSHX  
+  01f9 8b       [2]             PSHH  
+  01fa 95       [2]             TSX   
+  01fb af51     [2]             AIX   #81
+  01fd a602     [2]             LDA   #2
+  01ff cd0000   [6]             JSR   SCIgets
+  0202 a702     [2]             AIS   #2
+  204:  			    opcao = String2Uint32(opcaoStr);
+  0204 450000   [3]             LDHX  @opcao
+  0207 89       [2]             PSHX  
+  0208 8b       [2]             PSHH  
+  0209 95       [2]             TSX   
+  020a af51     [2]             AIX   #81
+  020c cd0000   [6]             JSR   String2Uint32
+  020f a702     [2]             AIS   #2
+  0211          L211:   
+  205:  			    
+  206:  				  app_status = SELECTED_FIRMWARE;
+  207:  
+  208:  				break;
+  209:  		  case SELECTED_FIRMWARE:			    
+  210:  			    switch (opcao) {
+  211:  			      case 1:
+  212:                SCITransmitStr("\r\nIniciando em modo Portadora modulada...\r\n");
+  213:                app_status = TX_MOD;
+  214:  			        break;
+  215:  			      case 2:
+  216:                SCITransmitStr("\r\nIniciando em modo Portadora nao modulada...\r\n");
+  217:                app_status = TX_NOMOD;
+  218:  			        break;
+  219:  			      case 3:
+  220:                SCITransmitStr("\r\nIniciando em modo Transmissor...\r\n");
+  221:                app_status = INPUT_VALUE;
+  222:  			        break;
+  223:  			      case 4:
+  224:                SCITransmitStr("\r\nIniciando em modo Receptor...\r\n");
+  225:                app_status = RECEIVER_MODE;
+  226:  			        break;
+  227:  			    }
+  228:  		    break;
+  229:  		    
+  230:  		  case TX_MOD:
+  231:  		    LED1 = LED_ON;
+  232:  			  #if LCD_ENABLED
+  233:  				   LCDWriteString(1, "Portadora");
+  234:  				   LCDWriteString(2, "modulada");
+  235:  				#endif
+  236:  				MLMETestMode (&tx_packet, FORCE_IDLE);
+  237:  				MLMETestMode (&tx_packet, CONTINUOUS_TX_MOD);
+  238:  		    break;
+  239:  								
+  240:  		  case TX_NOMOD:
+  241:  		    LED2 = LED_ON;
+  242:  			  #if LCD_ENABLED
+  243:  				   LCDWriteString(1, "Portadora");
+  244:  				   LCDWriteString(2, "nao modulada");
+  245:  				#endif
+  246:  				MLMETestMode (&tx_packet, FORCE_IDLE);
+  247:  				MLMETestMode (&tx_packet, CONTINUOUS_TX_NOMOD);
+  248:  		    break;
+  249:  								
+  250:   		  case INPUT_VALUE:
+  251:   		  
+  252:            #if LCD_ENABLED
+  253:              LCDWriteString(1, "Transmissor");
+  254:              LCDWriteString(2, "");
+  255:            #endif
+  256:            
+  257:   		      for (loop = 0; loop < 6; loop++)
+  258:   		        quantidadePkt[loop] = 0;
+  259:   		      for (loop = 0; loop < 4; loop++)
+  260:   		        tamanhoPkt[loop] = 0;
+  261:   		      for (loop = 0; loop < 4; loop++)
+  262:   		        intervaloPkt[loop] = 0;
+  263:   		      for (loop = 0; loop < 4; loop++)
+  264:   		        repetirPkt[loop] = 0;
+  265:   		  
+  266:   		      LED1 = LED_ON;
+  267:   		      
+  268:            (void)SCIgets("\r\nEntre com o numero de pacotes:\r\n", &quantidadePkt[0],9);
+  269:  
+  270:   		      LED2 = LED_ON;
+  271:   		      
+  272:            (void)SCIgets("\r\nEntre com o tamanho dos pacotes(bytes):\r\n", &tamanhoPkt[0],4);
+  273:  		  
+  274:   		      LED3 = LED_ON;
+  275:   		      
+  276:            (void)SCIgets("\r\nEntre com o intervalo entre os pacotes(10ms):\r\n", &intervaloPkt[0],4);
+  277:  		  
+  278:   		      LED4 = LED_ON;
+  279:   		      
+  280:   		      (void)SCIgets("\r\nEntre com quantas vezes o teste vai ser executado:\r\n", &repetirPkt[0],4);
+  281:   		      
+  282:   		      (void)SCIgets("\r\nEntre com a potencia de transmissao [0-255](default=11):\r\n", &potenciaPkt[0],4);
+  283:   		      
+  284:  			    SCITransmitStr("\r\nNumero de pacotes:");
+  285:  			    SCITransmitStr(quantidadePkt);
+  286:  			    
+  287:  			    packet_number = String2Uint32(quantidadePkt);
+  288:  
+  289:  			    SCITransmitStr("\r\nTamanho dos pacotes:");
+  290:  			    SCITransmitStr(tamanhoPkt);
+  291:  			    
+  292:  			    packet_size = String2Uint32(tamanhoPkt);
+  293:  
+  294:  			    SCITransmitStr("\r\nIntervalo entre os pacotes:");
+  295:  			    SCITransmitStr(intervaloPkt);
+  296:  			    
+  297:  			    packet_interval = String2Uint32(intervaloPkt);
+  298:  			    
+  299:  			    SCITransmitStr("\r\nExecutar o testes:");
+  300:  			    SCITransmitStr(repetirPkt);
+  301:  			    
+  302:  			    packet_repeat = String2Uint32(repetirPkt);
+  303:  			    //packet_repeat = 1;
+  304:  			    
+  305:  			    if (packet_repeat < 1) {
+  306:  			      packet_repeat = 1;
+  307:  			    }
+  308:  			    
+  309:  			    SCITransmitStr("\r\nPotencia de transmissao:");
+  310:  			    SCITransmitStr(potenciaPkt);
+  311:  			    
+  312:  			    packet_power = String2Uint32(potenciaPkt);
+  313:  			    
+  314:  				  app_status = WAITING_START;
+  315:  
+  316:  		    break;
+  317:  		  case WAITING_START:
+  318:  		  
+  319:            (void)SCIgets("\r\nTecle <ENTER> para iniciar o teste:", &App_String,1);
+  320:          
+  321:  				  app_status = SEND_START;
+  322:  
+  323:  		    break;
+  324:  		  case SEND_START:
+  325:  				  LED1 = LED_OFF; LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_OFF;	//All LEDs Off
+  326:            (void)MLMEMC13192PAOutputAdjust(packet_power);	//Set Nominal power setting	
+  327:            
+  328:    		    LED4 = LED_ON;
+  329:  		      
+  330:            SCITransmitStr("\r\nIniciando o teste numero ");
+  331:            (void)int2string((UINT32) packet_repeat, App_String);
+  332:            (void)trimWhiteSpace(App_String);
+  333:            SCITransmitStr(App_String);	
+  334:            SCITransmitStr(".");        	      
+  335:            
+  336:    				for (i=0; i<(packet_size-2); i++) {
+  337:  	  			   tx_data_buffer[i] = 0xAA; // 10101010
+  338:  		  		}
+  339:    				//tx_data_buffer[packet_size-3] = 0; 
+  340:  			  	tx_packet.u8DataLength = (packet_size-2);
+  341:  				
+  342:            app_status = TX_STATE;
+  343:  				break;
+  344:  				
+  345:  			case TX_STATE:		 
+  346:  				//Load the tx buffer with the ZigBee packet.
+  347:  				
+  348:  		    LED3 = LED_ON;
+  349:  		    
+  350:  		    // Enviar sempre o mesmo pacote  
+  351:  				RAMDrvWriteTx(&tx_packet);
+  352:          
+  353:  			  SCITransmitStr("\r\nIniciando transmissao...\r\n");
+  354:  			  
+  355:  			  for (loop=0;loop<packet_number;loop++) {
+  356:  			    
+  357:    				LED1 ^=1;
+  358:    				
+  359:    				tx_data_buffer[packet_size-3] += 1; 
+  360:    				
+  361:  /*  				
+  362:  */
+  363:  			    SCITransmitStr("\r\nN:");
+  364:  			    (void)int2string((UINT32) loop, App_String);
+  365:  			    (void)trimWhiteSpace(App_String);
+  366:  			    SCITransmitStr(App_String);
+  367:  				
+  368:  				  SCITransmitStr(" L:");
+  369:  			    (void)int2string((UINT32) tx_packet.u8DataLength, App_String);
+  370:  			    (void)trimWhiteSpace(App_String);
+  371:  			    SCITransmitStr(App_String);
+  372:  
+  373:  //          SCITransmitStr(" Data=");
+  374:  //          SCITransmitFormattedArray(tx_data_buffer, tx_packet.u8DataLength);
+  375:  //          SCITransmitStr("\r");
+  376:  /*
+  377:  */
+  378:  			  
+  379:  				  //if (MCPSDataRequest(&tx_packet) == SUCCESS)	//TX Packet, Blocking will stay here until the packet is in the air
+  380:  				  if (MCPSDataRequestWithoutLoad() == SUCCESS)	//TX Packet, Blocking will stay here until the packet is in the air
+  381:    				  LED2 ^=1;
+  382:  				
+  383:            //packet_count++;
+  384:  				
+  385:  				  //MLME_RX_enable_request(&rx_packet,DELAY_COUNT);	//Now turn on the RX with a timeout of DELAY_COUNT
+  386:  				  for(i=0;i<packet_interval;i++) {
+  387:  		        delay(1);
+  388:  				  }
+  389:            
+  390:  			  }
+  391:  		   
+  392:  			  SCITransmitStr("\r\nTransmissao encerrada.\r\n");
+  393:  			  
+  394:  		    LED3 = LED_OFF;
+  395:  		      
+  396:  				//if (packet_count < packet_number)
+  397:  				//  app_status = DELAY_STATE ; 	//Set app_status as waiting for ack. 
+  398:  			  //else
+  399:  			  
+  400:  		    app_status = TRANSMITER_FINAL_STATE;				
+  401:  		    
+  402:  				break;
+  403:  
+  404:  		   case TRANSMITER_FINAL_STATE:
+  405:  
+  406:  		      tx_packet.pu8Data[0] = 'D';
+  407:  		      tx_packet.pu8Data[1] = 'O';
+  408:  		      tx_packet.pu8Data[2] = 'N';
+  409:  		      tx_packet.pu8Data[3] = 'E';
+  410:  		      tx_packet.pu8Data[4] = 'D';
+  411:  		      tx_packet.pu8Data[5] = 'O';
+  412:  		      tx_packet.pu8Data[6] = 'N';
+  413:  		      tx_packet.pu8Data[7] = 'E';
+  414:  		      tx_packet.pu8Data[8] = '\0';
+  415:  		      tx_packet.u8DataLength = 9;
+  416:    		      
+  417:            (void)MLMEMC13192PAOutputAdjust(MAX_POWER);	//Set Nominal power setting	
+  418:            
+  419:  		      for (i=0; i<2; i++) {
+  420:  		         for (loop = 0; loop < DELAY_COUNT; loop++);
+  421:  		         (void)MCPSDataRequest(&tx_packet);
+  422:  		         app_status = TRANSMITER_FINAL_STATE;
+  423:  		      }
+  424:  		      
+  425:  		      LED1 = LED_OFF;
+  426:  		      
+  427:  		      LED4 = LED_OFF;
+  428:  		      		      
+  429:    			  packet_repeat --;
+  430:  	  		  if (packet_repeat < 1) {
+  431:    		      app_status = SELECTED_FIRMWARE;
+  432:  			    } else {
+  433:  		        for(i=0;i<5;i++)
+  434:  		          delaySeconds(1);
+  435:  				    app_status = SEND_START;				
+  436:  			    }
+  437:  				
+  438:  		      break;
+  439:  		      
+  440:  		  case RECEIVER_MODE:
+  441:  
+  442:   		      LED1 = LED_ON;
+  443:   		      
+  444:            #if LCD_ENABLED
+  445:              LCDWriteString(1, "Receptor");
+  446:              LCDWriteString(2, "");
+  447:            #endif
+  448:            
+  449:            //(void)SCIgets("\r\nEntre com o tamanho dos pacotes(bytes):\r\n", &tamanhoPkt[0],3);
+  450:  		  
+  451:  			    //packet_size = String2Uint32(tamanhoPkt);
+  452:  
+  453:    			  SCITransmitStr("\r\nIniciando receptor...\r\n");
+  454:    			  
+  455:  			    packet_count = 0;
+  456:  
+  457:  			    for(loop=0;loop<10;loop++) {
+  458:  			      packet_histogramy[loop] = 0;
+  459:  			    }
+  460:  				  app_status = RX_STATE;
+  461:  		    break;
+  462:  				
+  463:  			case RX_STATE:
+  464:  			  
+  465:  //				MLMETestMode (&tx_packet, FORCE_IDLE);
+  466:  //				MLMETestMode (&tx_packet, CONTINUOUS_RX);
+  467:  
+  468:  				MLMERXEnableRequest(&rx_packet,0); //Zero means wait forever with RX ON.
+  469:    				
+  470:  				app_status = WAITING_FOR_ACK;
+  471:  	  			
+  472:  				break;
+  473:  			case WAITING_FOR_ACK:
+  474:  			
+  475:  				break;
+  476:  			
+  477:  			case GOOD_PACKET:
+  478:  			   LED1 ^= 1;
+  479:  			   
+  480:           link_quality = (UINT8)(MLMELinkQuality()/2);	//Read the link quality of the last received packet. 
+  481:           
+  482:           // Histograma do RSSI
+  483:           // 0 : < 40 db
+  484:           // 1 : 40 db - 45 db
+  485:           // 2 : 45 db - 50 db
+  486:           // 3 : 50 db - 55 db
+  487:           // 4 : 55 db - 60 db
+  488:           // 5 : 60 db - 65 db
+  489:           // 6 : 65 db - 70 db
+  490:           // 7 : 70 db - 75 db
+  491:           // 8 : 75 db - 80 db
+  492:           // 9 : 80 db - 85 db
+  493:           if (link_quality <= 40) {
+  494:            packet_histogramy[0] ++;
+  495:           } else if (link_quality <= 45) {
+  496:            packet_histogramy[1] ++;
+  497:           } else if (link_quality <= 50) {
+  498:            packet_histogramy[2] ++;
+  499:           } else if (link_quality <= 55) {
+  500:            packet_histogramy[3] ++;
+  501:           } else if (link_quality <= 60) {
+  502:            packet_histogramy[4] ++;
+  503:           } else if (link_quality <= 65) {
+  504:            packet_histogramy[5] ++;
+  505:           } else if (link_quality <= 70) {
+  506:            packet_histogramy[6] ++;
+  507:           } else if (link_quality <= 75) {
+  508:            packet_histogramy[7] ++;
+  509:           } else if (link_quality <= 80) {
+  510:            packet_histogramy[8] ++;
+  511:           } else {
+  512:            packet_histogramy[9] ++;
+  513:           }
+  514:  			   
+  515:  /*
+  516:            // Nao imprimir dados do pacotes pois deixa lento 
+  517:            // e alguns pacotes nao sao processados.
+  518:  */
+  519:  			    SCITransmitStr("\r\nN:");
+  520:  			   (void)int2string((UINT32) packet_count, App_String);
+  521:  			   (void)trimWhiteSpace(App_String);
+  522:  			   SCITransmitStr(App_String);
+  523:  				
+  524:  				SCITransmitStr(" L:");
+  525:  			   (void)int2string((UINT32) rx_packet.u8DataLength, App_String);
+  526:  			   (void)trimWhiteSpace(App_String);
+  527:  			   SCITransmitStr(App_String);
+  528:  
+  529:              link_quality = (UINT8)(MLMELinkQuality()/2);	//Read the link quality of the last received packet.  
+  530:              SCITransmitStr(" LQI=-");
+  531:  			   (void)int2string((UINT32) link_quality, App_String);
+  532:  			   (void)trimWhiteSpace(App_String);
+  533:  			   SCITransmitStr(App_String);				
+  534:  			   	
+  535:  //          SCITransmitStr(" CRC=1 Data=");
+  536:  //          SCITransmitFormattedArray(rx_packet.pu8Data, rx_packet.u8DataLength);
+  537:  //          SCITransmitStr("\r");
+  538:  
+  539:  /*          
+  540:  */
+  541:  //            if (packet_count % 100) {
+  542:  //              SCITransmitStr(".");
+  543:  //            }
+  544:              
+  545:              packet_count++;
+  546:            
+  547:              app_status = RX_STATE;
+  548:              
+  549:              break;
+  550:              
+  551:  		   case ECHO_STATE:
+  552:  			
+  553:  					LED4 = LED_OFF;
+  554:  					
+  555:  					if (packet_count != 0) {
+  556:  					  
+  557:              link_quality = (UINT8)(MLMELinkQuality()/2);	//Read the link quality of the last received packet.  
+  558:            
+  559:  	  	      SCITransmitStr("\r\nGood:");
+  560:  		  	    (void)int2string((UINT32) (packet_count), App_String);
+  561:  			      (void)trimWhiteSpace(App_String);
+  562:  			      SCITransmitStr(App_String);
+  563:  			      SCITransmitStr("/");
+  564:    				  (void)int2string((UINT32) (packet_number), App_String);//SCITransmitStr("/TEST_NUM\r\r");
+  565:  	  			  (void)trimWhiteSpace(App_String);
+  566:  		  	    SCITransmitStr(App_String);
+  567:  			    
+  568:  		        SCITransmitStr("\r\nHistograma RSSI");
+  569:  			      for(loop=0;loop<10;loop++) {
+  570:    		        SCITransmitStr("\r\n[-");
+  571:    	  		    (void)int2string((UINT32) (40+(loop*5)), App_String);
+  572:  	  	  	    (void)trimWhiteSpace(App_String);
+  573:  		  	      SCITransmitStr(App_String);				
+  574:    		        SCITransmitStr("]:");
+  575:  	  		      (void)int2string((UINT32) packet_histogramy[loop], App_String);
+  576:  		  	      (void)trimWhiteSpace(App_String);
+  577:  			        SCITransmitStr(App_String);				
+  578:    			    }
+  579:    			    
+  580:            }
+  581:  				  
+  582:            app_status = RECEIVER_FINAL_STATE;
+  583:            
+  584:  				break;
+  585:  				
+  586:  		   case RECEIVER_FINAL_STATE:
+  587:  		   
+  588:  	  			app_status = SELECTED_FIRMWARE;
+  0211 ae17     [2]             LDX   #23
+  0213 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  0216          L216:   
+  0216 320000   [5]             LDHX  opcao
+  0219 c60003   [4]             LDA   opcao:3
+  021c 87       [2]             PSHA  
+  021d c60002   [4]             LDA   opcao:2
+  0220 9ee702   [4]             STA   2,SP
+  0223 87       [2]             PSHA  
+  0224 89       [2]             PSHX  
+  0225 8b       [2]             PSHH  
+  0226 95       [2]             TSX   
+  0227 cd0000   [6]             JSR   _LCMP_RC
+  022a 00000003         DC.L  3
+  022e cd0000   [6]             JSR   _PUSH_CC
+  0231 95       [2]             TSX   
+  0232 e708     [3]             STA   8,X
+  0234 ee05     [3]             LDX   5,X
+  0236 9eef0a   [4]             STX   10,SP
+  0239 95       [2]             TSX   
+  023a e604     [3]             LDA   4,X
+  023c e70a     [3]             STA   10,X
+  023e e607     [3]             LDA   7,X
+  0240 cd0000   [6]             JSR   _POP_CC
+  0243 a704     [2]             AIS   #4
+  0245 2447     [3]             BCC   L28E ;abs = 028e
+  0247 87       [2]             PSHA  
+  0248 ee08     [3]             LDX   8,X
+  024a 89       [2]             PSHX  
+  024b 95       [2]             TSX   
+  024c e603     [3]             LDA   3,X
+  024e 87       [2]             PSHA  
+  024f e604     [3]             LDA   4,X
+  0251 87       [2]             PSHA  
+  0252 95       [2]             TSX   
+  0253 cd0000   [6]             JSR   _LCMP_RC
+  0256 00000001         DC.L  1
+  025a cd0000   [6]             JSR   _PUSH_CC
+  025d 9eee07   [4]             LDX   7,SP
+  0260 9ee606   [4]             LDA   6,SP
+  0263 9ee70b   [4]             STA   11,SP
+  0266 9ee605   [4]             LDA   5,SP
+  0269 9ee70a   [4]             STA   10,SP
+  026c 9ee608   [4]             LDA   8,SP
+  026f cd0000   [6]             JSR   _POP_CC
+  0272 a704     [2]             AIS   #4
+  0274 2734     [3]             BEQ   L2AA ;abs = 02aa
+  0276 87       [2]             PSHA  
+  0277 89       [2]             PSHX  
+  0278 95       [2]             TSX   
+  0279 e604     [3]             LDA   4,X
+  027b 87       [2]             PSHA  
+  027c e603     [3]             LDA   3,X
+  027e 87       [2]             PSHA  
+  027f 95       [2]             TSX   
+  0280 cd0000   [6]             JSR   _LCMP_RC
+  0283 00000002         DC.L  2
+  0287 a704     [2]             AIS   #4
+  0289 272a     [3]             BEQ   L2B5 ;abs = 02b5
+  028b cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  028e          L28E:   
+  028e 2730     [3]             BEQ   L2C0 ;abs = 02c0
+  0290 87       [2]             PSHA  
+  0291 ee08     [3]             LDX   8,X
+  0293 89       [2]             PSHX  
+  0294 95       [2]             TSX   
+  0295 e603     [3]             LDA   3,X
+  0297 87       [2]             PSHA  
+  0298 e604     [3]             LDA   4,X
+  029a 87       [2]             PSHA  
+  029b 95       [2]             TSX   
+  029c cd0000   [6]             JSR   _LCMP_RC
+  029f 00000004         DC.L  4
+  02a3 a704     [2]             AIS   #4
+  02a5 2724     [3]             BEQ   L2CB ;abs = 02cb
+  02a7 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  02aa          L2AA:   
+  02aa 450000   [3]             LDHX  @"\015\012Iniciando em modo Portadora modulada...\015\012"
+  02ad cd0000   [6]             JSR   SCITransmitStr
+  02b0 ae13     [2]             LDX   #19
+  02b2 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  02b5          L2B5:   
+  02b5 450000   [3]             LDHX  @"\015\012Iniciando em modo Portadora nao modulada...\015\012"
+  02b8 cd0000   [6]             JSR   SCITransmitStr
+  02bb ae12     [2]             LDX   #18
+  02bd cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  02c0          L2C0:   
+  02c0 450000   [3]             LDHX  @"\015\012Iniciando em modo Transmissor...\015\012"
+  02c3 cd0000   [6]             JSR   SCITransmitStr
+  02c6 ae0f     [2]             LDX   #15
+  02c8 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  02cb          L2CB:   
+  02cb 450000   [3]             LDHX  @"\015\012Iniciando em modo Receptor...\015\012"
+  02ce cd0000   [6]             JSR   SCITransmitStr
+  02d1 ae14     [2]             LDX   #20
+  02d3 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  02d6          L2D6:   
+  02d6 1900     [5]             BCLR  4,_PTDD
+  02d8 a601     [2]             LDA   #1
+  02da 450000   [3]             LDHX  @"Portadora"
+  02dd cd0000   [6]             JSR   LCDWriteString
+  02e0 a602     [2]             LDA   #2
+  02e2 450000   [3]             LDHX  @"modulada"
+  02e5 cd0000   [6]             JSR   LCDWriteString
+  02e8 95       [2]             TSX   
+  02e9 af0b     [2]             AIX   #11
+  02eb a602     [2]             LDA   #2
+  02ed cd0000   [6]             JSR   MLMETestMode
+  02f0 95       [2]             TSX   
+  02f1 af0b     [2]             AIX   #11
+  02f3 a604     [2]             LDA   #4
+  02f5 cd0000   [6]             JSR   MLMETestMode
+  02f8 cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  02fb          L2FB:   
+  02fb 1b00     [5]             BCLR  5,_PTDD
+  02fd a601     [2]             LDA   #1
+  02ff 450000   [3]             LDHX  @"Portadora"
+  0302 cd0000   [6]             JSR   LCDWriteString
+  0305 a602     [2]             LDA   #2
+  0307 450000   [3]             LDHX  @"nao modulada"
+  030a cd0000   [6]             JSR   LCDWriteString
+  030d 95       [2]             TSX   
+  030e af0b     [2]             AIX   #11
+  0310 a602     [2]             LDA   #2
+  0312 cd0000   [6]             JSR   MLMETestMode
+  0315 95       [2]             TSX   
+  0316 af0b     [2]             AIX   #11
+  0318 a605     [2]             LDA   #5
+  031a cd0000   [6]             JSR   MLMETestMode
+  031d cc0a10   [4]             JMP   LA10 ;abs = 0a10
+  0320          L320:   
+  0320 a601     [2]             LDA   #1
+  0322 450000   [3]             LDHX  @"Transmissor"
+  0325 cd0000   [6]             JSR   LCDWriteString
+  0328 a602     [2]             LDA   #2
+  032a 450000   [3]             LDHX  @""
+  032d cd0000   [6]             JSR   LCDWriteString
+  0330 5f       [1]             CLRX  
+  0331 8c       [1]             CLRH  
+  0332 9eff06   [5]             STHX  6,SP
+  0335 8c       [1]             CLRH  
+  0336 9eff04   [5]             STHX  4,SP
+  0339          L339:   
+  0339 95       [2]             TSX   
+  033a af2c     [2]             AIX   #44
+  033c 9f       [1]             TXA   
+  033d 9eeb07   [4]             ADD   7,SP
+  0340 87       [2]             PSHA  
+  0341 8b       [2]             PSHH  
+  0342 86       [3]             PULA  
+  0343 a900     [2]             ADC   #0
+  0345 87       [2]             PSHA  
+  0346 8a       [3]             PULH  
+  0347 88       [3]             PULX  
+  0348 7f       [4]             CLR   ,X
+  0349 95       [2]             TSX   
+  034a af03     [2]             AIX   #3
+  034c cd0000   [6]             JSR   _LINC
+  034f cd0000   [6]             JSR   _POP32
+  0352 9efe04   [5]             LDHX  4,SP
+  0355 2608     [3]             BNE   L35F ;abs = 035f
+  0357 9efe06   [5]             LDHX  6,SP
+  035a 650006   [3]             CPHX  #6
+  035d 25da     [3]             BCS   L339 ;abs = 0339
+  035f          L35F:   
+  035f 5f       [1]             CLRX  
+  0360 8c       [1]             CLRH  
+  0361 9eff06   [5]             STHX  6,SP
+  0364 8c       [1]             CLRH  
+  0365 9eff04   [5]             STHX  4,SP
+  0368          L368:   
+  0368 95       [2]             TSX   
+  0369 af1d     [2]             AIX   #29
+  036b 9f       [1]             TXA   
+  036c 9eeb07   [4]             ADD   7,SP
+  036f 87       [2]             PSHA  
+  0370 8b       [2]             PSHH  
+  0371 86       [3]             PULA  
+  0372 a900     [2]             ADC   #0
+  0374 87       [2]             PSHA  
+  0375 8a       [3]             PULH  
+  0376 88       [3]             PULX  
+  0377 7f       [4]             CLR   ,X
+  0378 95       [2]             TSX   
+  0379 af03     [2]             AIX   #3
+  037b cd0000   [6]             JSR   _LINC
+  037e cd0000   [6]             JSR   _POP32
+  0381 9efe04   [5]             LDHX  4,SP
+  0384 2608     [3]             BNE   L38E ;abs = 038e
+  0386 9efe06   [5]             LDHX  6,SP
+  0389 650004   [3]             CPHX  #4
+  038c 25da     [3]             BCS   L368 ;abs = 0368
+  038e          L38E:   
+  038e 5f       [1]             CLRX  
+  038f 8c       [1]             CLRH  
+  0390 9eff06   [5]             STHX  6,SP
+  0393 8c       [1]             CLRH  
+  0394 9eff04   [5]             STHX  4,SP
+  0397          L397:   
+  0397 95       [2]             TSX   
+  0398 af22     [2]             AIX   #34
+  039a 9f       [1]             TXA   
+  039b 9eeb07   [4]             ADD   7,SP
+  039e 87       [2]             PSHA  
+  039f 8b       [2]             PSHH  
+  03a0 86       [3]             PULA  
+  03a1 a900     [2]             ADC   #0
+  03a3 87       [2]             PSHA  
+  03a4 8a       [3]             PULH  
+  03a5 88       [3]             PULX  
+  03a6 7f       [4]             CLR   ,X
+  03a7 95       [2]             TSX   
+  03a8 af03     [2]             AIX   #3
+  03aa cd0000   [6]             JSR   _LINC
+  03ad cd0000   [6]             JSR   _POP32
+  03b0 9efe04   [5]             LDHX  4,SP
+  03b3 2608     [3]             BNE   L3BD ;abs = 03bd
+  03b5 9efe06   [5]             LDHX  6,SP
+  03b8 650004   [3]             CPHX  #4
+  03bb 25da     [3]             BCS   L397 ;abs = 0397
+  03bd          L3BD:   
+  03bd 5f       [1]             CLRX  
+  03be 8c       [1]             CLRH  
+  03bf 9eff06   [5]             STHX  6,SP
+  03c2 8c       [1]             CLRH  
+  03c3 9eff04   [5]             STHX  4,SP
+  03c6          L3C6:   
+  03c6 95       [2]             TSX   
+  03c7 af27     [2]             AIX   #39
+  03c9 9f       [1]             TXA   
+  03ca 9eeb07   [4]             ADD   7,SP
+  03cd 87       [2]             PSHA  
+  03ce 8b       [2]             PSHH  
+  03cf 86       [3]             PULA  
+  03d0 a900     [2]             ADC   #0
+  03d2 87       [2]             PSHA  
+  03d3 8a       [3]             PULH  
+  03d4 88       [3]             PULX  
+  03d5 7f       [4]             CLR   ,X
+  03d6 95       [2]             TSX   
+  03d7 af03     [2]             AIX   #3
+  03d9 cd0000   [6]             JSR   _LINC
+  03dc cd0000   [6]             JSR   _POP32
+  03df 9efe04   [5]             LDHX  4,SP
+  03e2 2608     [3]             BNE   L3EC ;abs = 03ec
+  03e4 9efe06   [5]             LDHX  6,SP
+  03e7 650004   [3]             CPHX  #4
+  03ea 25da     [3]             BCS   L3C6 ;abs = 03c6
+  03ec          L3EC:   
+  03ec 1900     [5]             BCLR  4,_PTDD
+  03ee 450000   [3]             LDHX  @"\015\012Entre com o numero de pacotes:\015\012"
+  03f1 89       [2]             PSHX  
+  03f2 8b       [2]             PSHH  
+  03f3 95       [2]             TSX   
+  03f4 af2e     [2]             AIX   #46
+  03f6 a609     [2]             LDA   #9
+  03f8 cd0000   [6]             JSR   SCIgets
+  03fb a702     [2]             AIS   #2
+  03fd 1b00     [5]             BCLR  5,_PTDD
+  03ff 450000   [3]             LDHX  @"\015\012Entre com o tamanho dos pacotes(bytes):\015\012"
+  0402 89       [2]             PSHX  
+  0403 8b       [2]             PSHH  
+  0404 95       [2]             TSX   
+  0405 af1f     [2]             AIX   #31
+  0407 a604     [2]             LDA   #4
+  0409 cd0000   [6]             JSR   SCIgets
+  040c a702     [2]             AIS   #2
+  040e 1d00     [5]             BCLR  6,_PTDD
+  0410 450000   [3]             LDHX  @"\015\012Entre com o intervalo entre os pacotes(10ms):\015\012"
+  0413 89       [2]             PSHX  
+  0414 8b       [2]             PSHH  
+  0415 95       [2]             TSX   
+  0416 af24     [2]             AIX   #36
+  0418 a604     [2]             LDA   #4
+  041a cd0000   [6]             JSR   SCIgets
+  041d a702     [2]             AIS   #2
+  041f 1f00     [5]             BCLR  7,_PTDD
+  0421 450000   [3]             LDHX  @"\015\012Entre com quantas vezes o teste vai ser executado:\015\012"
+  0424 89       [2]             PSHX  
+  0425 8b       [2]             PSHH  
+  0426 95       [2]             TSX   
+  0427 af29     [2]             AIX   #41
+  0429 a604     [2]             LDA   #4
+  042b cd0000   [6]             JSR   SCIgets
+  042e a702     [2]             AIS   #2
+  0430 450000   [3]             LDHX  @"\015\012Entre com a potencia de transmissao [0-255](default=11):\015\012"
+  0433 89       [2]             PSHX  
+  0434 8b       [2]             PSHH  
+  0435 95       [2]             TSX   
+  0436 af38     [2]             AIX   #56
+  0438 a604     [2]             LDA   #4
+  043a cd0000   [6]             JSR   SCIgets
+  043d a702     [2]             AIS   #2
+  043f 450000   [3]             LDHX  @"\015\012Numero de pacotes:"
+  0442 cd0000   [6]             JSR   SCITransmitStr
+  0445 95       [2]             TSX   
+  0446 af2c     [2]             AIX   #44
+  0448 cd0000   [6]             JSR   SCITransmitStr
+  044b 450000   [3]             LDHX  @packet_number
+  044e 89       [2]             PSHX  
+  044f 8b       [2]             PSHH  
+  0450 95       [2]             TSX   
+  0451 af2e     [2]             AIX   #46
+  0453 cd0000   [6]             JSR   String2Uint32
+  0456 a702     [2]             AIS   #2
+  0458 450000   [3]             LDHX  @"\015\012Tamanho dos pacotes:"
+  045b cd0000   [6]             JSR   SCITransmitStr
+  045e 95       [2]             TSX   
+  045f af1d     [2]             AIX   #29
+  0461 cd0000   [6]             JSR   SCITransmitStr
+  0464 450000   [3]             LDHX  @packet_size
+  0467 89       [2]             PSHX  
+  0468 8b       [2]             PSHH  
+  0469 95       [2]             TSX   
+  046a af1f     [2]             AIX   #31
+  046c cd0000   [6]             JSR   String2Uint32
+  046f a702     [2]             AIS   #2
+  0471 450000   [3]             LDHX  @"\015\012Intervalo entre os pacotes:"
+  0474 cd0000   [6]             JSR   SCITransmitStr
+  0477 95       [2]             TSX   
+  0478 af22     [2]             AIX   #34
+  047a cd0000   [6]             JSR   SCITransmitStr
+  047d 450000   [3]             LDHX  @packet_interval
+  0480 89       [2]             PSHX  
+  0481 8b       [2]             PSHH  
+  0482 95       [2]             TSX   
+  0483 af24     [2]             AIX   #36
+  0485 cd0000   [6]             JSR   String2Uint32
+  0488 a702     [2]             AIS   #2
+  048a 450000   [3]             LDHX  @"\015\012Executar o testes:"
+  048d cd0000   [6]             JSR   SCITransmitStr
+  0490 95       [2]             TSX   
+  0491 af27     [2]             AIX   #39
+  0493 cd0000   [6]             JSR   SCITransmitStr
+  0496 450000   [3]             LDHX  @packet_repeat
+  0499 89       [2]             PSHX  
+  049a 8b       [2]             PSHH  
+  049b 95       [2]             TSX   
+  049c af29     [2]             AIX   #41
+  049e cd0000   [6]             JSR   String2Uint32
+  04a1 a702     [2]             AIS   #2
+  04a3 320000   [5]             LDHX  packet_repeat
+  04a6 2612     [3]             BNE   L4BA ;abs = 04ba
+  04a8 320002   [5]             LDHX  packet_repeat:2
+  04ab 650001   [3]             CPHX  #1
+  04ae 240a     [3]             BCC   L4BA ;abs = 04ba
+  04b0 ae01     [2]             LDX   #1
+  04b2 8c       [1]             CLRH  
+  04b3 960002   [5]             STHX  packet_repeat:2
+  04b6 5f       [1]             CLRX  
+  04b7 960000   [5]             STHX  packet_repeat
+  04ba          L4BA:   
+  04ba 450000   [3]             LDHX  @"\015\012Potencia de transmissao:"
+  04bd cd0000   [6]             JSR   SCITransmitStr
+  04c0 95       [2]             TSX   
+  04c1 af36     [2]             AIX   #54
+  04c3 cd0000   [6]             JSR   SCITransmitStr
+  04c6 450000   [3]             LDHX  @packet_power
+  04c9 89       [2]             PSHX  
+  04ca 8b       [2]             PSHH  
+  04cb 95       [2]             TSX   
+  04cc af38     [2]             AIX   #56
+  04ce cd0000   [6]             JSR   String2Uint32
+  04d1 a702     [2]             AIS   #2
+  04d3 ae10     [2]             LDX   #16
+  04d5 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  04d8          L4D8:   
+  04d8 450000   [3]             LDHX  @"\015\012Tecle <ENTER> para iniciar o teste:"
+  04db 89       [2]             PSHX  
+  04dc 8b       [2]             PSHH  
+  04dd 95       [2]             TSX   
+  04de af15     [2]             AIX   #21
+  04e0 a601     [2]             LDA   #1
+  04e2 cd0000   [6]             JSR   SCIgets
+  04e5 a702     [2]             AIS   #2
+  04e7 cc07ba   [4]             JMP   L7BA ;abs = 07ba
+  04ea          L4EA:   
+  04ea 1800     [5]             BSET  4,_PTDD
+  04ec 1a00     [5]             BSET  5,_PTDD
+  04ee 1c00     [5]             BSET  6,_PTDD
+  04f0 1e00     [5]             BSET  7,_PTDD
+  04f2 c60003   [4]             LDA   packet_power:3
+  04f5 cd0000   [6]             JSR   MLMEMC13192PAOutputAdjust
+  04f8 1f00     [5]             BCLR  7,_PTDD
+  04fa 450000   [3]             LDHX  @"\015\012Iniciando o teste numero "
+  04fd cd0000   [6]             JSR   SCITransmitStr
+  0500 320002   [5]             LDHX  packet_repeat:2
+  0503 89       [2]             PSHX  
+  0504 8b       [2]             PSHH  
+  0505 320000   [5]             LDHX  packet_repeat
+  0508 89       [2]             PSHX  
+  0509 8b       [2]             PSHH  
+  050a 95       [2]             TSX   
+  050b af17     [2]             AIX   #23
+  050d cd0000   [6]             JSR   int2string
+  0510 a704     [2]             AIS   #4
+  0512 95       [2]             TSX   
+  0513 af13     [2]             AIX   #19
+  0515 cd0000   [6]             JSR   trimWhiteSpace
+  0518 95       [2]             TSX   
+  0519 af13     [2]             AIX   #19
+  051b cd0000   [6]             JSR   SCITransmitStr
+  051e 450000   [3]             LDHX  @"."
+  0521 cd0000   [6]             JSR   SCITransmitStr
+  0524 5f       [1]             CLRX  
+  0525 8c       [1]             CLRH  
+  0526 9eff0a   [5]             STHX  10,SP
+  0529 8c       [1]             CLRH  
+  052a 9eff08   [5]             STHX  8,SP
+  052d 201b     [3]             BRA   L54A ;abs = 054a
+  052f          L52F:   
+  052f 95       [2]             TSX   
+  0530 af3b     [2]             AIX   #59
+  0532 9f       [1]             TXA   
+  0533 9eeb0b   [4]             ADD   11,SP
+  0536 87       [2]             PSHA  
+  0537 8b       [2]             PSHH  
+  0538 86       [3]             PULA  
+  0539 a900     [2]             ADC   #0
+  053b 87       [2]             PSHA  
+  053c 8a       [3]             PULH  
+  053d 88       [3]             PULX  
+  053e a6aa     [2]             LDA   #-86
+  0540 f7       [2]             STA   ,X
+  0541 95       [2]             TSX   
+  0542 af07     [2]             AIX   #7
+  0544 cd0000   [6]             JSR   _LINC
+  0547 cd0000   [6]             JSR   _POP32
+  054a          L54A:   
+  054a 450000   [3]             LDHX  @packet_size
+  054d e603     [3]             LDA   3,X
+  054f a002     [2]             SUB   #2
+  0551 87       [2]             PSHA  
+  0552 e602     [3]             LDA   2,X
+  0554 a200     [2]             SBC   #0
+  0556 87       [2]             PSHA  
+  0557 e601     [3]             LDA   1,X
+  0559 a200     [2]             SBC   #0
+  055b 87       [2]             PSHA  
+  055c f6       [3]             LDA   ,X
+  055d a200     [2]             SBC   #0
+  055f 9eee03   [4]             LDX   3,SP
+  0562 89       [2]             PSHX  
+  0563 95       [2]             TSX   
+  0564 e704     [3]             STA   4,X
+  0566 e602     [3]             LDA   2,X
+  0568 87       [2]             PSHA  
+  0569 e601     [3]             LDA   1,X
+  056b 87       [2]             PSHA  
+  056c e604     [3]             LDA   4,X
+  056e 87       [2]             PSHA  
+  056f 95       [2]             TSX   
+  0570 ef04     [3]             STX   4,X
+  0572 87       [2]             PSHA  
+  0573 8b       [2]             PSHH  
+  0574 86       [3]             PULA  
+  0575 e705     [3]             STA   5,X
+  0577 86       [3]             PULA  
+  0578 af0e     [2]             AIX   #14
+  057a 89       [2]             PSHX  
+  057b 8b       [2]             PSHH  
+  057c 95       [2]             TSX   
+  057d e607     [3]             LDA   7,X
+  057f 87       [2]             PSHA  
+  0580 ee06     [3]             LDX   6,X
+  0582 8a       [3]             PULH  
+  0583 cd0000   [6]             JSR   _LCMP
+  0586 a707     [2]             AIS   #7
+  0588 22a5     [3]             BHI   L52F ;abs = 052f
+  058a c60003   [4]             LDA   packet_size:3
+  058d a002     [2]             SUB   #2
+  058f 9ee70c   [4]             STA   12,SP
+  0592 ae05     [2]             LDX   #5
+  0594 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  0597          L597:   
+  0597 1d00     [5]             BCLR  6,_PTDD
+  0599 95       [2]             TSX   
+  059a af0b     [2]             AIX   #11
+  059c cd0000   [6]             JSR   RAMDrvWriteTx
+  059f 450000   [3]             LDHX  @"\015\012Iniciando transmissao...\015\012"
+  05a2 cd0000   [6]             JSR   SCITransmitStr
+  05a5 5f       [1]             CLRX  
+  05a6 8c       [1]             CLRH  
+  05a7 9eff06   [5]             STHX  6,SP
+  05aa 8c       [1]             CLRH  
+  05ab 9eff04   [5]             STHX  4,SP
+  05ae cc06a7   [4]             JMP   L6A7 ;abs = 06a7
+  05b1          L5B1:   
+  05b1 b600     [3]             LDA   _PTDD
+  05b3 a810     [2]             EOR   #16
+  05b5 b700     [3]             STA   _PTDD
+  05b7 95       [2]             TSX   
+  05b8 af38     [2]             AIX   #56
+  05ba c60003   [4]             LDA   packet_size:3
+  05bd 48       [1]             LSLA  
+  05be 4f       [1]             CLRA  
+  05bf a200     [2]             SBC   #0
+  05c1 87       [2]             PSHA  
+  05c2 9f       [1]             TXA   
+  05c3 cb0003   [4]             ADD   packet_size:3
+  05c6 87       [2]             PSHA  
+  05c7 8b       [2]             PSHH  
+  05c8 86       [3]             PULA  
+  05c9 9ee902   [4]             ADC   2,SP
+  05cc 87       [2]             PSHA  
+  05cd 8b       [2]             PSHH  
+  05ce 86       [3]             PULA  
+  05cf 9ee703   [4]             STA   3,SP
+  05d2 8a       [3]             PULH  
+  05d3 89       [2]             PSHX  
+  05d4 9eee02   [4]             LDX   2,SP
+  05d7 7c       [4]             INC   ,X
+  05d8 86       [3]             PULA  
+  05d9 9eee02   [4]             LDX   2,SP
+  05dc 9ee702   [4]             STA   2,SP
+  05df c60003   [4]             LDA   packet_size:3
+  05e2 48       [1]             LSLA  
+  05e3 4f       [1]             CLRA  
+  05e4 a200     [2]             SBC   #0
+  05e6 87       [2]             PSHA  
+  05e7 9ee603   [4]             LDA   3,SP
+  05ea cb0003   [4]             ADD   packet_size:3
+  05ed 9ee703   [4]             STA   3,SP
+  05f0 9f       [1]             TXA   
+  05f1 9ee901   [4]             ADC   1,SP
+  05f4 9eee02   [4]             LDX   2,SP
+  05f7 fe       [3]             LDX   ,X
+  05f8 87       [2]             PSHA  
+  05f9 9eef03   [4]             STX   3,SP
+  05fc 9eee04   [4]             LDX   4,SP
+  05ff 9ee603   [4]             LDA   3,SP
+  0602 8a       [3]             PULH  
+  0603 f7       [2]             STA   ,X
+  0604 450000   [3]             LDHX  @"\015\012N:"
+  0607 cd0000   [6]             JSR   SCITransmitStr
+  060a 9efe09   [5]             LDHX  9,SP
+  060d 89       [2]             PSHX  
+  060e 8b       [2]             PSHH  
+  060f 9efe09   [5]             LDHX  9,SP
+  0612 89       [2]             PSHX  
+  0613 8b       [2]             PSHH  
+  0614 95       [2]             TSX   
+  0615 af1a     [2]             AIX   #26
+  0617 cd0000   [6]             JSR   int2string
+  061a a704     [2]             AIS   #4
+  061c 95       [2]             TSX   
+  061d af16     [2]             AIX   #22
+  061f cd0000   [6]             JSR   trimWhiteSpace
+  0622 95       [2]             TSX   
+  0623 af16     [2]             AIX   #22
+  0625 cd0000   [6]             JSR   SCITransmitStr
+  0628 450000   [3]             LDHX  @" L:"
+  062b cd0000   [6]             JSR   SCITransmitStr
+  062e 9ee60f   [4]             LDA   15,SP
+  0631 87       [2]             PSHA  
+  0632 4f       [1]             CLRA  
+  0633 87       [2]             PSHA  
+  0634 87       [2]             PSHA  
+  0635 87       [2]             PSHA  
+  0636 95       [2]             TSX   
+  0637 af1a     [2]             AIX   #26
+  0639 cd0000   [6]             JSR   int2string
+  063c a704     [2]             AIS   #4
+  063e 95       [2]             TSX   
+  063f af16     [2]             AIX   #22
+  0641 cd0000   [6]             JSR   trimWhiteSpace
+  0644 95       [2]             TSX   
+  0645 af16     [2]             AIX   #22
+  0647 cd0000   [6]             JSR   SCITransmitStr
+  064a cd0000   [6]             JSR   MCPSDataRequestWithoutLoad
+  064d 650077   [3]             CPHX  #119
+  0650 a703     [2]             AIS   #3
+  0652 2606     [3]             BNE   L65A ;abs = 065a
+  0654 b600     [3]             LDA   _PTDD
+  0656 a820     [2]             EOR   #32
+  0658 b700     [3]             STA   _PTDD
+  065a          L65A:   
+  065a 5f       [1]             CLRX  
+  065b 8c       [1]             CLRH  
+  065c 9eff0a   [5]             STHX  10,SP
+  065f 8c       [1]             CLRH  
+  0660 9eff08   [5]             STHX  8,SP
+  0663 200f     [3]             BRA   L674 ;abs = 0674
+  0665          L665:   
+  0665 ae01     [2]             LDX   #1
+  0667 8c       [1]             CLRH  
+  0668 cd0000   [6]             JSR   delay
+  066b 95       [2]             TSX   
+  066c af07     [2]             AIX   #7
+  066e cd0000   [6]             JSR   _LINC
+  0671 cd0000   [6]             JSR   _POP32
+  0674          L674:   
+  0674 c60000   [4]             LDA   packet_interval
+  0677 9ee108   [4]             CMP   8,SP
+  067a 22e9     [3]             BHI   L665 ;abs = 0665
+  067c 2608     [3]             BNE   L686 ;abs = 0686
+  067e c60001   [4]             LDA   packet_interval:1
+  0681 9ee109   [4]             CMP   9,SP
+  0684 22df     [3]             BHI   L665 ;abs = 0665
+  0686          L686:   
+  0686 c60001   [4]             LDA   packet_interval:1
+  0689 9ee109   [4]             CMP   9,SP
+  068c 2610     [3]             BNE   L69E ;abs = 069e
+  068e c60000   [4]             LDA   packet_interval
+  0691 9ee108   [4]             CMP   8,SP
+  0694 2608     [3]             BNE   L69E ;abs = 069e
+  0696 320002   [5]             LDHX  packet_interval:2
+  0699 9ef30a   [6]             CPHX  10,SP
+  069c 22c7     [3]             BHI   L665 ;abs = 0665
+  069e          L69E:   
+  069e 95       [2]             TSX   
+  069f af03     [2]             AIX   #3
+  06a1 cd0000   [6]             JSR   _LINC
+  06a4 cd0000   [6]             JSR   _POP32
+  06a7          L6A7:   
+  06a7 c60000   [4]             LDA   packet_number
+  06aa 9ee104   [4]             CMP   4,SP
+  06ad 2303     [3]             BLS   L6B2 ;abs = 06b2
+  06af cc05b1   [4]             JMP   L5B1 ;abs = 05b1
+  06b2          L6B2:   
+  06b2 9ee104   [4]             CMP   4,SP
+  06b5 260b     [3]             BNE   L6C2 ;abs = 06c2
+  06b7 c60001   [4]             LDA   packet_number:1
+  06ba 9ee105   [4]             CMP   5,SP
+  06bd 2303     [3]             BLS   L6C2 ;abs = 06c2
+  06bf cc05b1   [4]             JMP   L5B1 ;abs = 05b1
+  06c2          L6C2:   
+  06c2 c60001   [4]             LDA   packet_number:1
+  06c5 9ee105   [4]             CMP   5,SP
+  06c8 2613     [3]             BNE   L6DD ;abs = 06dd
+  06ca c60000   [4]             LDA   packet_number
+  06cd 9ee104   [4]             CMP   4,SP
+  06d0 260b     [3]             BNE   L6DD ;abs = 06dd
+  06d2 320002   [5]             LDHX  packet_number:2
+  06d5 9ef306   [6]             CPHX  6,SP
+  06d8 2303     [3]             BLS   L6DD ;abs = 06dd
+  06da cc05b1   [4]             JMP   L5B1 ;abs = 05b1
+  06dd          L6DD:   
+  06dd 450000   [3]             LDHX  @"\015\012Transmissao encerrada.\015\012"
+  06e0 cd0000   [6]             JSR   SCITransmitStr
+  06e3 1c00     [5]             BSET  6,_PTDD
+  06e5 ae15     [2]             LDX   #21
+  06e7 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  06ea          L6EA:   
+  06ea 9efe0d   [5]             LDHX  13,SP
+  06ed a644     [2]             LDA   #68
+  06ef f7       [2]             STA   ,X
+  06f0 9efe0d   [5]             LDHX  13,SP
+  06f3 a64f     [2]             LDA   #79
+  06f5 e701     [3]             STA   1,X
+  06f7 9efe0d   [5]             LDHX  13,SP
+  06fa 4a       [1]             DECA  
+  06fb e702     [3]             STA   2,X
+  06fd 9efe0d   [5]             LDHX  13,SP
+  0700 a645     [2]             LDA   #69
+  0702 e703     [3]             STA   3,X
+  0704 9efe0d   [5]             LDHX  13,SP
+  0707 a644     [2]             LDA   #68
+  0709 e704     [3]             STA   4,X
+  070b 9efe0d   [5]             LDHX  13,SP
+  070e a64f     [2]             LDA   #79
+  0710 e705     [3]             STA   5,X
+  0712 9efe0d   [5]             LDHX  13,SP
+  0715 4a       [1]             DECA  
+  0716 e706     [3]             STA   6,X
+  0718 9efe0d   [5]             LDHX  13,SP
+  071b a645     [2]             LDA   #69
+  071d e707     [3]             STA   7,X
+  071f 9efe0d   [5]             LDHX  13,SP
+  0722 6f08     [5]             CLR   8,X
+  0724 a609     [2]             LDA   #9
+  0726 9ee70c   [4]             STA   12,SP
+  0729 a664     [2]             LDA   #100
+  072b cd0000   [6]             JSR   MLMEMC13192PAOutputAdjust
+  072e 5f       [1]             CLRX  
+  072f 8c       [1]             CLRH  
+  0730 9eff0a   [5]             STHX  10,SP
+  0733 8c       [1]             CLRH  
+  0734 9eff08   [5]             STHX  8,SP
+  0737          L737:   
+  0737 5f       [1]             CLRX  
+  0738 8c       [1]             CLRH  
+  0739 9eff06   [5]             STHX  6,SP
+  073c 8c       [1]             CLRH  
+  073d 9eff04   [5]             STHX  4,SP
+  0740          L740:   
+  0740 95       [2]             TSX   
+  0741 af03     [2]             AIX   #3
+  0743 cd0000   [6]             JSR   _LINC
+  0746 cd0000   [6]             JSR   _POP32
+  0749 9efe04   [5]             LDHX  4,SP
+  074c 2608     [3]             BNE   L756 ;abs = 0756
+  074e 9efe06   [5]             LDHX  6,SP
+  0751 65b000   [3]             CPHX  #-20480
+  0754 25ea     [3]             BCS   L740 ;abs = 0740
+  0756          L756:   
+  0756 95       [2]             TSX   
+  0757 af0b     [2]             AIX   #11
+  0759 cd0000   [6]             JSR   MCPSDataRequest
+  075c ae15     [2]             LDX   #21
+  075e 8c       [1]             CLRH  
+  075f 960000   [5]             STHX  app_status
+  0762 95       [2]             TSX   
+  0763 af07     [2]             AIX   #7
+  0765 cd0000   [6]             JSR   _LINC
+  0768 cd0000   [6]             JSR   _POP32
+  076b 9efe08   [5]             LDHX  8,SP
+  076e 2608     [3]             BNE   L778 ;abs = 0778
+  0770 9efe0a   [5]             LDHX  10,SP
+  0773 650002   [3]             CPHX  #2
+  0776 25bf     [3]             BCS   L737 ;abs = 0737
+  0778          L778:   
+  0778 1800     [5]             BSET  4,_PTDD
+  077a 1e00     [5]             BSET  7,_PTDD
+  077c 450000   [3]             LDHX  @packet_repeat
+  077f cd0000   [6]             JSR   _LDEC
+  0782 cd0000   [6]             JSR   _POP32
+  0785 320000   [5]             LDHX  packet_repeat
+  0788 260b     [3]             BNE   L795 ;abs = 0795
+  078a 320002   [5]             LDHX  packet_repeat:2
+  078d 650001   [3]             CPHX  #1
+  0790 2403     [3]             BCC   L795 ;abs = 0795
+  0792 cc0211   [4]             JMP   L211 ;abs = 0211
+  0795          L795:   
+  0795 5f       [1]             CLRX  
+  0796 8c       [1]             CLRH  
+  0797 9eff0a   [5]             STHX  10,SP
+  079a 8c       [1]             CLRH  
+  079b 9eff08   [5]             STHX  8,SP
+  079e          L79E:   
+  079e ae01     [2]             LDX   #1
+  07a0 8c       [1]             CLRH  
+  07a1 cd0000   [6]             JSR   delaySeconds
+  07a4 95       [2]             TSX   
+  07a5 af07     [2]             AIX   #7
+  07a7 cd0000   [6]             JSR   _LINC
+  07aa cd0000   [6]             JSR   _POP32
+  07ad 9efe08   [5]             LDHX  8,SP
+  07b0 2608     [3]             BNE   L7BA ;abs = 07ba
+  07b2 9efe0a   [5]             LDHX  10,SP
+  07b5 650005   [3]             CPHX  #5
+  07b8 25e4     [3]             BCS   L79E ;abs = 079e
+  07ba          L7BA:   
+  07ba ae0e     [2]             LDX   #14
+  07bc cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  07bf          L7BF:   
+  07bf 1900     [5]             BCLR  4,_PTDD
+  07c1 a601     [2]             LDA   #1
+  07c3 450000   [3]             LDHX  @"Receptor"
+  07c6 cd0000   [6]             JSR   LCDWriteString
+  07c9 a602     [2]             LDA   #2
+  07cb 450000   [3]             LDHX  @""
+  07ce cd0000   [6]             JSR   LCDWriteString
+  07d1 450000   [3]             LDHX  @"\015\012Iniciando receptor...\015\012"
+  07d4 cd0000   [6]             JSR   SCITransmitStr
+  07d7 5f       [1]             CLRX  
+  07d8 8c       [1]             CLRH  
+  07d9 960002   [5]             STHX  packet_count:2
+  07dc 8c       [1]             CLRH  
+  07dd 960000   [5]             STHX  packet_count
+  07e0 8c       [1]             CLRH  
+  07e1 9eff06   [5]             STHX  6,SP
+  07e4 8c       [1]             CLRH  
+  07e5 9eff04   [5]             STHX  4,SP
+  07e8          L7E8:   
+  07e8 9eee07   [4]             LDX   7,SP
+  07eb 58       [1]             LSLX  
+  07ec 58       [1]             LSLX  
+  07ed 4f       [1]             CLRA  
+  07ee 8c       [1]             CLRH  
+  07ef d70003   [4]             STA   @packet_histogramy:3,X
+  07f2 d70002   [4]             STA   @packet_histogramy:2,X
+  07f5 d70001   [4]             STA   @packet_histogramy:1,X
+  07f8 d70000   [4]             STA   @packet_histogramy,X
+  07fb 95       [2]             TSX   
+  07fc af03     [2]             AIX   #3
+  07fe cd0000   [6]             JSR   _LINC
+  0801 cd0000   [6]             JSR   _POP32
+  0804 9efe04   [5]             LDHX  4,SP
+  0807 2703     [3]             BEQ   L80C ;abs = 080c
+  0809 cc090a   [4]             JMP   L90A ;abs = 090a
+  080c          L80C:   
+  080c 9efe06   [5]             LDHX  6,SP
+  080f 65000a   [3]             CPHX  #10
+  0812 25d4     [3]             BCS   L7E8 ;abs = 07e8
+  0814 cc090a   [4]             JMP   L90A ;abs = 090a
+  0817          L817:   
+  0817 95       [2]             TSX   
+  0818 af0e     [2]             AIX   #14
+  081a 89       [2]             PSHX  
+  081b 8b       [2]             PSHH  
+  081c 4f       [1]             CLRA  
+  081d 87       [2]             PSHA  
+  081e 87       [2]             PSHA  
+  081f 87       [2]             PSHA  
+  0820 87       [2]             PSHA  
+  0821 cd0000   [6]             JSR   MLMERXEnableRequest
+  0824 a706     [2]             AIS   #6
+  0826 ae04     [2]             LDX   #4
+  0828 cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  082b          L82B:   
+  082b b600     [3]             LDA   _PTDD
+  082d a810     [2]             EOR   #16
+  082f b700     [3]             STA   _PTDD
+  0831 cd0000   [6]             JSR   MLMELinkQuality
+  0834 44       [1]             LSRA  
+  0835 c70000   [4]             STA   link_quality
+  0838 a128     [2]             CMP   #40
+  083a 2205     [3]             BHI   L841 ;abs = 0841
+  083c 450000   [3]             LDHX  @packet_histogramy
+  083f 204b     [3]             BRA   L88C ;abs = 088c
+  0841          L841:   
+  0841 a12d     [2]             CMP   #45
+  0843 2205     [3]             BHI   L84A ;abs = 084a
+  0845 450004   [3]             LDHX  @packet_histogramy:4
+  0848 2042     [3]             BRA   L88C ;abs = 088c
+  084a          L84A:   
+  084a a132     [2]             CMP   #50
+  084c 2205     [3]             BHI   L853 ;abs = 0853
+  084e 450008   [3]             LDHX  @packet_histogramy:8
+  0851 2039     [3]             BRA   L88C ;abs = 088c
+  0853          L853:   
+  0853 a137     [2]             CMP   #55
+  0855 2205     [3]             BHI   L85C ;abs = 085c
+  0857 45000c   [3]             LDHX  @packet_histogramy:12
+  085a 2030     [3]             BRA   L88C ;abs = 088c
+  085c          L85C:   
+  085c a13c     [2]             CMP   #60
+  085e 2205     [3]             BHI   L865 ;abs = 0865
+  0860 450010   [3]             LDHX  @packet_histogramy:16
+  0863 2027     [3]             BRA   L88C ;abs = 088c
+  0865          L865:   
+  0865 a141     [2]             CMP   #65
+  0867 2205     [3]             BHI   L86E ;abs = 086e
+  0869 450014   [3]             LDHX  @packet_histogramy:20
+  086c 201e     [3]             BRA   L88C ;abs = 088c
+  086e          L86E:   
+  086e a146     [2]             CMP   #70
+  0870 2205     [3]             BHI   L877 ;abs = 0877
+  0872 450018   [3]             LDHX  @packet_histogramy:24
+  0875 2015     [3]             BRA   L88C ;abs = 088c
+  0877          L877:   
+  0877 a14b     [2]             CMP   #75
+  0879 2205     [3]             BHI   L880 ;abs = 0880
+  087b 45001c   [3]             LDHX  @packet_histogramy:28
+  087e 200c     [3]             BRA   L88C ;abs = 088c
+  0880          L880:   
+  0880 a150     [2]             CMP   #80
+  0882 2205     [3]             BHI   L889 ;abs = 0889
+  0884 450020   [3]             LDHX  @packet_histogramy:32
+  0887 2003     [3]             BRA   L88C ;abs = 088c
+  0889          L889:   
+  0889 450024   [3]             LDHX  @packet_histogramy:36
+  088c          L88C:   
+  088c cd0000   [6]             JSR   _LINC
+  088f cd0000   [6]             JSR   _POP32
+  0892 450000   [3]             LDHX  @"\015\012N:"
+  0895 cd0000   [6]             JSR   SCITransmitStr
+  0898 320002   [5]             LDHX  packet_count:2
+  089b 89       [2]             PSHX  
+  089c 8b       [2]             PSHH  
+  089d 320000   [5]             LDHX  packet_count
+  08a0 89       [2]             PSHX  
+  08a1 8b       [2]             PSHH  
+  08a2 95       [2]             TSX   
+  08a3 af17     [2]             AIX   #23
+  08a5 cd0000   [6]             JSR   int2string
+  08a8 a704     [2]             AIS   #4
+  08aa 95       [2]             TSX   
+  08ab af13     [2]             AIX   #19
+  08ad cd0000   [6]             JSR   trimWhiteSpace
+  08b0 95       [2]             TSX   
+  08b1 af13     [2]             AIX   #19
+  08b3 cd0000   [6]             JSR   SCITransmitStr
+  08b6 450000   [3]             LDHX  @" L:"
+  08b9 cd0000   [6]             JSR   SCITransmitStr
+  08bc 9ee610   [4]             LDA   16,SP
+  08bf 87       [2]             PSHA  
+  08c0 4f       [1]             CLRA  
+  08c1 87       [2]             PSHA  
+  08c2 87       [2]             PSHA  
+  08c3 87       [2]             PSHA  
+  08c4 95       [2]             TSX   
+  08c5 af17     [2]             AIX   #23
+  08c7 cd0000   [6]             JSR   int2string
+  08ca a704     [2]             AIS   #4
+  08cc 95       [2]             TSX   
+  08cd af13     [2]             AIX   #19
+  08cf cd0000   [6]             JSR   trimWhiteSpace
+  08d2 95       [2]             TSX   
+  08d3 af13     [2]             AIX   #19
+  08d5 cd0000   [6]             JSR   SCITransmitStr
+  08d8 cd0000   [6]             JSR   MLMELinkQuality
+  08db 44       [1]             LSRA  
+  08dc c70000   [4]             STA   link_quality
+  08df 450000   [3]             LDHX  @" LQI=-"
+  08e2 cd0000   [6]             JSR   SCITransmitStr
+  08e5 c60000   [4]             LDA   link_quality
+  08e8 87       [2]             PSHA  
+  08e9 4f       [1]             CLRA  
+  08ea 87       [2]             PSHA  
+  08eb 87       [2]             PSHA  
+  08ec 87       [2]             PSHA  
+  08ed 95       [2]             TSX   
+  08ee af17     [2]             AIX   #23
+  08f0 cd0000   [6]             JSR   int2string
+  08f3 a704     [2]             AIS   #4
+  08f5 95       [2]             TSX   
+  08f6 af13     [2]             AIX   #19
+  08f8 cd0000   [6]             JSR   trimWhiteSpace
+  08fb 95       [2]             TSX   
+  08fc af13     [2]             AIX   #19
+  08fe cd0000   [6]             JSR   SCITransmitStr
+  0901 450000   [3]             LDHX  @packet_count
+  0904 cd0000   [6]             JSR   _LINC
+  0907 cd0000   [6]             JSR   _POP32
+  090a          L90A:   
+  090a ae06     [2]             LDX   #6
+  090c cc0a0c   [4]             JMP   LA0C ;abs = 0a0c
+  090f          L90F:   
+  090f 1e00     [5]             BSET  7,_PTDD
+  0911 450000   [3]             LDHX  @packet_count
+  0914 e603     [3]             LDA   3,X
+  0916 ea02     [3]             ORA   2,X
+  0918 ea01     [3]             ORA   1,X
+  091a fa       [3]             ORA   ,X
+  091b 2603     [3]             BNE   L920 ;abs = 0920
+  091d cc0a03   [4]             JMP   LA03 ;abs = 0a03
+  0920          L920:   
+  0920 cd0000   [6]             JSR   MLMELinkQuality
+  0923 44       [1]             LSRA  
+  0924 c70000   [4]             STA   link_quality
+  0927 450000   [3]             LDHX  @"\015\012Good:"
+  092a cd0000   [6]             JSR   SCITransmitStr
+  092d 320002   [5]             LDHX  packet_count:2
+  0930 89       [2]             PSHX  
+  0931 8b       [2]             PSHH  
+  0932 320000   [5]             LDHX  packet_count
+  0935 89       [2]             PSHX  
+  0936 8b       [2]             PSHH  
+  0937 95       [2]             TSX   
+  0938 af17     [2]             AIX   #23
+  093a cd0000   [6]             JSR   int2string
+  093d a704     [2]             AIS   #4
+  093f 95       [2]             TSX   
+  0940 af13     [2]             AIX   #19
+  0942 cd0000   [6]             JSR   trimWhiteSpace
+  0945 95       [2]             TSX   
+  0946 af13     [2]             AIX   #19
+  0948 cd0000   [6]             JSR   SCITransmitStr
+  094b 450000   [3]             LDHX  @"/"
+  094e cd0000   [6]             JSR   SCITransmitStr
+  0951 320002   [5]             LDHX  packet_number:2
+  0954 89       [2]             PSHX  
+  0955 8b       [2]             PSHH  
+  0956 320000   [5]             LDHX  packet_number
+  0959 89       [2]             PSHX  
+  095a 8b       [2]             PSHH  
+  095b 95       [2]             TSX   
+  095c af17     [2]             AIX   #23
+  095e cd0000   [6]             JSR   int2string
+  0961 a704     [2]             AIS   #4
+  0963 95       [2]             TSX   
+  0964 af13     [2]             AIX   #19
+  0966 cd0000   [6]             JSR   trimWhiteSpace
+  0969 95       [2]             TSX   
+  096a af13     [2]             AIX   #19
+  096c cd0000   [6]             JSR   SCITransmitStr
+  096f 450000   [3]             LDHX  @"\015\012Histograma RSSI"
+  0972 cd0000   [6]             JSR   SCITransmitStr
+  0975 5f       [1]             CLRX  
+  0976 8c       [1]             CLRH  
+  0977 9eff06   [5]             STHX  6,SP
+  097a 8c       [1]             CLRH  
+  097b 9eff04   [5]             STHX  4,SP
+  097e          L97E:   
+  097e 450000   [3]             LDHX  @"\015\012[-"
+  0981 cd0000   [6]             JSR   SCITransmitStr
+  0984 95       [2]             TSX   
+  0985 af03     [2]             AIX   #3
+  0987 cd0000   [6]             JSR   _LMUL_RC
+  098a 00000005         DC.L  5
+  098e 95       [2]             TSX   
+  098f e603     [3]             LDA   3,X
+  0991 ab28     [2]             ADD   #40
+  0993 87       [2]             PSHA  
+  0994 e602     [3]             LDA   2,X
+  0996 a900     [2]             ADC   #0
+  0998 87       [2]             PSHA  
+  0999 e601     [3]             LDA   1,X
+  099b a900     [2]             ADC   #0
+  099d 87       [2]             PSHA  
+  099e f6       [3]             LDA   ,X
+  099f a900     [2]             ADC   #0
+  09a1 87       [2]             PSHA  
+  09a2 af17     [2]             AIX   #23
+  09a4 cd0000   [6]             JSR   int2string
+  09a7 a704     [2]             AIS   #4
+  09a9 95       [2]             TSX   
+  09aa af17     [2]             AIX   #23
+  09ac cd0000   [6]             JSR   trimWhiteSpace
+  09af 95       [2]             TSX   
+  09b0 af17     [2]             AIX   #23
+  09b2 cd0000   [6]             JSR   SCITransmitStr
+  09b5 450000   [3]             LDHX  @"]:"
+  09b8 cd0000   [6]             JSR   SCITransmitStr
+  09bb 9eee0b   [4]             LDX   11,SP
+  09be 58       [1]             LSLX  
+  09bf 58       [1]             LSLX  
+  09c0 8c       [1]             CLRH  
+  09c1 9eef05   [4]             STX   5,SP
+  09c4 9ebe0002 [6]             LDHX  @packet_histogramy:2,X
+  09c8 89       [2]             PSHX  
+  09c9 8b       [2]             PSHH  
+  09ca 8c       [1]             CLRH  
+  09cb 9eee07   [4]             LDX   7,SP
+  09ce 9ebe0000 [6]             LDHX  @packet_histogramy,X
+  09d2 89       [2]             PSHX  
+  09d3 8b       [2]             PSHH  
+  09d4 95       [2]             TSX   
+  09d5 af1b     [2]             AIX   #27
+  09d7 cd0000   [6]             JSR   int2string
+  09da a704     [2]             AIS   #4
+  09dc 95       [2]             TSX   
+  09dd af17     [2]             AIX   #23
+  09df cd0000   [6]             JSR   trimWhiteSpace
+  09e2 95       [2]             TSX   
+  09e3 af17     [2]             AIX   #23
+  09e5 cd0000   [6]             JSR   SCITransmitStr
+  09e8 95       [2]             TSX   
+  09e9 af07     [2]             AIX   #7
+  09eb cd0000   [6]             JSR   _LINC
+  09ee cd0000   [6]             JSR   _POP32
+  09f1 9efe08   [5]             LDHX  8,SP
+  09f4 a704     [2]             AIS   #4
+  09f6 260b     [3]             BNE   LA03 ;abs = 0a03
+  09f8 9efe06   [5]             LDHX  6,SP
+  09fb 65000a   [3]             CPHX  #10
+  09fe 2403     [3]             BCC   LA03 ;abs = 0a03
+  0a00 cc097e   [4]             JMP   L97E ;abs = 097e
+  0a03          LA03:   
+  0a03 ae16     [2]             LDX   #22
+  0a05 2005     [3]             BRA   LA0C ;abs = 0a0c
+  0a07          LA07:   
+  589:  		      
+  590:            break;				
+  591:  			case RESET_STATE:
+  592:  				RadioInit();
+  0a07 cd0000   [6]             JSR   RadioInit
+  593:  				app_status = RECEIVER_ALWAYS_ON;
+  0a0a ae03     [2]             LDX   #3
+  0a0c          LA0C:   
+  0a0c 8c       [1]             CLRH  
+  0a0d 960000   [5]             STHX  app_status
+  0a10          LA10:   
+  594:  				break;
+  595:  				
+  596:  			case RECEIVER_ALWAYS_ON:
+  597:  				break;
+  598:  				
+  599:  		}
+  600:  	
+  601:  	
+  602:  			  /* Check for debounce timer (TIMER1) */
+  603:          if ((gu16Events & TIMER_EVENT1) != 0) {
+  0a10 c60001   [4]             LDA   gu16Events:1
+  0a13 a504     [2]             BIT   #4
+  0a15 270a     [3]             BEQ   LA21 ;abs = 0a21
+  604:              gu16Events &= ~TIMER_EVENT1; /* Clear the event */
+  0a17 a4fb     [2]             AND   #-5
+  0a19 c70001   [4]             STA   gu16Events:1
+  605:              gu16timerEvent[1] = 0; /* Turn off the timer */
+  0a1c 5f       [1]             CLRX  
+  0a1d 8c       [1]             CLRH  
+  0a1e 960002   [5]             STHX  gu16timerEvent:2
+  0a21          LA21:   
+  606:          }
+  607:          /* See if a RX ON Request has been made */	      
+  608:          if ((gu16Events & KBI2_EVENT) != 0) {
+  0a21 c60001   [4]             LDA   gu16Events:1
+  0a24 a510     [2]             BIT   #16
+  0a26 271c     [3]             BEQ   LA44 ;abs = 0a44
+  609:              #if BUZZER_ENABLED
+  610:                 BUZZER = BUZZER_ON;
+  0a28 1400     [5]             BSET  2,_PTDD
+  611:              #endif
+  612:                 delay(10);
+  0a2a ae0a     [2]             LDX   #10
+  0a2c 8c       [1]             CLRH  
+  0a2d cd0000   [6]             JSR   delay
+  613:              #if BUZZER_ENABLED
+  614:                 BUZZER = BUZZER_OFF;
+  0a30 1500     [5]             BCLR  2,_PTDD
+  615:              #endif
+  616:                 gu16Events &= ~KBI2_EVENT; /* Clear the event */
+  0a32 450001   [3]             LDHX  @gu16Events:1
+  0a35 f6       [3]             LDA   ,X
+  0a36 a4ef     [2]             AND   #-17
+  0a38 f7       [2]             STA   ,X
+  617:          	      
+  618:          	      KBI1SC |= 0x02; /* Enable Interrupts */
+  0a39 1200     [5]             BSET  1,_KBI1SC
+  619:             
+  620:             // Enviar o pacote para o TX com a quantidade de pacotes a
+  621:             // ser enviados e o tamanho desses pacotes
+  622:             
+  623:             MLMERXDisableRequest();
+  0a3b cd0000   [6]             JSR   MLMERXDisableRequest
+  624:          
+  625:            app_status = RECEIVER_FINAL_STATE;
+  0a3e ae16     [2]             LDX   #22
+  0a40 8c       [1]             CLRH  
+  0a41 960000   [5]             STHX  app_status
+  0a44          LA44:   
+  626:          }       
+  627:         
+  628:  	}
+  0a44 cc00e9   [4]             JMP   LE9 ;abs = 00e9
+  629:  }
+  630:  
+  631:  void MCPSDataIndication(tRxPacket *rx_packet2) {
+  632:  
+  633:  	if (rx_packet2->u8Status == TIMEOUT) {
+  0000 e604     [3]             LDA   4,X
+  0002 a185     [2]             CMP   #-123
+  0004 260a     [3]             BNE   L10 ;abs = 0010
+  634:  
+  635:  		/* Put timeout condition code here */
+  636:  		app_status = RX_STATE;	//Should not get here.
+  0006 89       [2]             PSHX  
+  0007 8b       [2]             PSHH  
+  0008 ae06     [2]             LDX   #6
+  000a 8c       [1]             CLRH  
+  000b 960000   [5]             STHX  app_status
+  000e 8a       [3]             PULH  
+  000f 88       [3]             PULX  
+  0010          L10:    
+  637:  
+  638:  	}
+  639:     if (rx_packet2->u8Status == SUCCESS) {      
+  0010 e604     [3]             LDA   4,X
+  0012 a177     [2]             CMP   #119
+  0014 261a     [3]             BNE   L30 ;abs = 0030
+  640:     
+  641:     
+  642:  	   if (strcmp(&rx_packet2->pu8Data[0], "DONEDONE") == 0)
+  0016 9ece02   [5]             LDHX  2,X
+  0019 89       [2]             PSHX  
+  001a 8b       [2]             PSHH  
+  001b 450000   [3]             LDHX  @"DONEDONE"
+  001e cd0000   [6]             JSR   strcmp
+  0021 a702     [2]             AIS   #2
+  0023 650000   [3]             CPHX  #0
+  0026 2604     [3]             BNE   L2C ;abs = 002c
+  643:  	      app_status = ECHO_STATE;
+  0028 ae0d     [2]             LDX   #13
+  002a 2010     [3]             BRA   L3C ;abs = 003c
+  002c          L2C:    
+  644:  	   //else if (rx_packet2->u8DataLength == (packet_size-2)){
+  645:  	   //   app_status = GOOD_PACKET;
+  646:  	   //} else{
+  647:  	   //   app_status = RX_STATE;
+  648:  	   //}
+  649:  	   else {
+  650:  	      app_status = GOOD_PACKET;
+  002c ae08     [2]             LDX   #8
+  002e 200c     [3]             BRA   L3C ;abs = 003c
+  0030          L30:    
+  651:  	   }
+  652:     } else if (rx_packet2->u8Status == CRC_ERROR) {
+  0030 a178     [2]             CMP   #120
+  0032 2606     [3]             BNE   L3A ;abs = 003a
+  653:  		        SCITransmitStr("\r\nCRC ERROR!!!!!!!!!!!!!!!!!!!!!!!!");
+  0034 450000   [3]             LDHX  @"\015\012CRC ERROR!!!!!!!!!!!!!!!!!!!!!!!!"
+  0037 cd0000   [6]             JSR   SCITransmitStr
+  003a          L3A:    
+  654:  	      app_status = RX_STATE;
+  655:  	} else {
+  656:  	   app_status = RX_STATE;
+  003a ae06     [2]             LDX   #6
+  003c          L3C:    
+  003c 8c       [1]             CLRH  
+  003d 960000   [5]             STHX  app_status
+  657:  	}
+  658:  }
+  0040 81       [6]             RTS   
+  659:  
+  660:  void MLMEMC13192ResetIndication() {
+  661:  	//Notifies you that the MC13192 has been reset.
+  662:  	//Application must handle this here.
+  663:  	app_status = RESET_STATE;
+  0000 ae02     [2]             LDX   #2
+  0002 8c       [1]             CLRH  
+  0003 960000   [5]             STHX  app_status
+  664:  }
+  0006 81       [6]             RTS   
+  665:  
+  666:  void app_init(void) {
+  667:    
+  668:    /* Init LED's */
+  669:  	LED1 = 1; /* Default is off */
+  0000 1800     [5]             BSET  4,_PTDD
+  670:  	LED2 = 1;
+  0002 1a00     [5]             BSET  5,_PTDD
+  671:  	LED3 = 1;
+  0004 1c00     [5]             BSET  6,_PTDD
+  672:  	LED4 = 1;
+  0006 1e00     [5]             BSET  7,_PTDD
+  673:  
+  674:  	LED1DIR = 1; /*Set the DDIR register as Outputs for the LED pins*/
+  0008 1800     [5]             BSET  4,_PTDDD
+  675:  	LED2DIR = 1;
+  000a 1a00     [5]             BSET  5,_PTDDD
+  676:  	LED3DIR = 1;
+  000c 1c00     [5]             BSET  6,_PTDDD
+  677:  	LED4DIR = 1;
+  000e 1e00     [5]             BSET  7,_PTDDD
+  678:  	
+  679:  	//Pull up the pushbuttons.
+  680:  	PB0PU = 1;
+  0010 1400     [5]             BSET  2,_PTAPE
+  681:     PB1PU = 1;
+  0012 1600     [5]             BSET  3,_PTAPE
+  682:     PB2PU = 1;
+  0014 1800     [5]             BSET  4,_PTAPE
+  683:     PB3PU = 1;
+  0016 1a00     [5]             BSET  5,_PTAPE
+  684:  
+  685:    /* OTAP entry */
+  686:    #if SMAC_FEATURE_OTAP == TRUE
+  687:    if (PB0 == 0){
+  688:      KBI1SC = 0x00; /* Turn On Interrupts */
+  689:      OTAPActivate();
+  690:    }
+  691:    #endif // SMAC_FEATURE_OTAP == TRUE
+  692:    
+  693:     /* Setup Timer 1 */
+  694:       /* Setup Timer 1 */
+  695:    TPM1MOD = 625; /* Set the timer for a 26ms timer rate (1/8E6) * 128 * 625 = 10msec */
+  0018 450271   [3]             LDHX  #625
+  001b 3500     [5]             STHX  _TPM1MOD
+  696:                   /* Timer rate = (1/BUSCLOCK) * TIMER_PRESCALER * TIMER MOD */
+  697:    TPM1SC = 0x4F; /* Timer divide by 128. (16uS timebase for 8MHz bus clock). interrupt on*/
+  001d 6e4f00   [4]             MOV   #79,_TPM1SC
+  698:  
+  699:  
+  700:  }
+  0020 81       [6]             RTS   
+  701:  

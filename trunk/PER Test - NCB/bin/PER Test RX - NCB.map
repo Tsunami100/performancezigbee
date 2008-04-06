@@ -1,0 +1,1831 @@
+
+PROGRAM "C:\Documents and Settings\Fabiano\Meus documentos\FirmwareTestesPER\FirmwareTestesPERV3\PER Test - NCB\bin\PER Test RX - NCB.abs"
+
+*********************************************************************************************
+TARGET SECTION
+---------------------------------------------------------------------------------------------
+Processor   : Freescale HC08
+Memory Model: SMALL
+File Format : ELF\DWARF 2.0
+Linker      : SmartLinker V-5.0.30 Build 7134, May 15 2007
+
+*********************************************************************************************
+FILE SECTION
+---------------------------------------------------------------------------------------------
+RTSHC08.C.o (ansiis.lib)                Model: SMALL,         Lang: ANSI-C
+STRING.C.o (ansiis.lib)                 Model: SMALL,         Lang: ANSI-C
+ascii_utilities.c.o                     Model: SMALL,         Lang: ANSI-C
+kbi.c.o                                 Model: SMALL,         Lang: ANSI-C
+LCD.c.o                                 Model: SMALL,         Lang: ANSI-C
+ledFunctions.c.o                        Model: SMALL,         Lang: ANSI-C
+SCI.c.o                                 Model: SMALL,         Lang: ANSI-C
+mc9s08gb60.c.o                          Model: SMALL,         Lang: ANSI-C
+MC1321XNCB.c.o                          Model: SMALL,         Lang: ANSI-C
+drivers.c.o                             Model: SMALL,         Lang: ANSI-C
+MC13192_hw_config.c.o                   Model: SMALL,         Lang: ANSI-C
+mcu_hw_config.c.o                       Model: SMALL,         Lang: ANSI-C
+mcu_spi_config.c.o                      Model: SMALL,         Lang: ANSI-C
+simple_mac.c.o                          Model: SMALL,         Lang: ANSI-C
+simple_phy.c.o                          Model: SMALL,         Lang: ANSI-C
+smac_per_rx.c.o                         Model: SMALL,         Lang: ANSI-C
+Start08.c.o                             Model: SMALL,         Lang: ANSI-C
+vectortable.c.o                         Model: SMALL,         Lang: ANSI-C
+timer.c.o                               Model: SMALL,         Lang: ANSI-C
+
+*********************************************************************************************
+STARTUP SECTION
+---------------------------------------------------------------------------------------------
+Entry point: 0x1893 (_Startup)
+_startupData is allocated at 0x189C and uses 6 Bytes
+extern struct _tagStartup {
+  unsigned nofZeroOut     1
+  _Range   pZeroOut       0x100     246
+  _Copy    *toCopyDownBeg 0x3FD9
+} _startupData;
+
+*********************************************************************************************
+SECTION-ALLOCATION SECTION
+Section Name                    Size  Type     From       To       Segment
+---------------------------------------------------------------------------------------------
+.text                           8945     R     0x18AA     0x3B9A   ROM
+.data                              1   R/W      0x100      0x100   RAM
+.abs_section_0                     1   N/I        0x0        0x0   .absSeg0
+.abs_section_1                     1   N/I        0x1        0x1   .absSeg1
+.abs_section_2                     1   N/I        0x2        0x2   .absSeg2
+.abs_section_3                     1   N/I        0x3        0x3   .absSeg3
+.abs_section_4                     1   N/I        0x4        0x4   .absSeg4
+.abs_section_5                     1   N/I        0x5        0x5   .absSeg5
+.abs_section_6                     1   N/I        0x6        0x6   .absSeg6
+.abs_section_7                     1   N/I        0x7        0x7   .absSeg7
+.abs_section_8                     1   N/I        0x8        0x8   .absSeg8
+.abs_section_9                     1   N/I        0x9        0x9   .absSeg9
+.abs_section_a                     1   N/I        0xA        0xA   .absSeg10
+.abs_section_b                     1   N/I        0xB        0xB   .absSeg11
+.abs_section_c                     1   N/I        0xC        0xC   .absSeg12
+.abs_section_d                     1   N/I        0xD        0xD   .absSeg13
+.abs_section_e                     1   N/I        0xE        0xE   .absSeg14
+.abs_section_f                     1   N/I        0xF        0xF   .absSeg15
+.abs_section_10                    1   N/I       0x10       0x10   .absSeg16
+.abs_section_11                    1   N/I       0x11       0x11   .absSeg17
+.abs_section_12                    1   N/I       0x12       0x12   .absSeg18
+.abs_section_13                    1   N/I       0x13       0x13   .absSeg19
+.abs_section_14                    1   N/I       0x14       0x14   .absSeg20
+.abs_section_16                    1   N/I       0x16       0x16   .absSeg21
+.abs_section_17                    1   N/I       0x17       0x17   .absSeg22
+.abs_section_1a                    1   N/I       0x1A       0x1A   .absSeg23
+.abs_section_1b                    1   N/I       0x1B       0x1B   .absSeg24
+.abs_section_1c                    1   N/I       0x1C       0x1C   .absSeg25
+.abs_section_1d                    1   N/I       0x1D       0x1D   .absSeg26
+.abs_section_1e                    1   N/I       0x1E       0x1E   .absSeg27
+.abs_section_1f                    1   N/I       0x1F       0x1F   .absSeg28
+.abs_section_22                    1   N/I       0x22       0x22   .absSeg29
+.abs_section_23                    1   N/I       0x23       0x23   .absSeg30
+.abs_section_24                    1   N/I       0x24       0x24   .absSeg31
+.abs_section_25                    1   N/I       0x25       0x25   .absSeg32
+.abs_section_26                    1   N/I       0x26       0x26   .absSeg33
+.abs_section_27                    1   N/I       0x27       0x27   .absSeg34
+.abs_section_28                    1   N/I       0x28       0x28   .absSeg35
+.abs_section_29                    1   N/I       0x29       0x29   .absSeg36
+.abs_section_2a                    1   N/I       0x2A       0x2A   .absSeg37
+.abs_section_2b                    1   N/I       0x2B       0x2B   .absSeg38
+.abs_section_2d                    1   N/I       0x2D       0x2D   .absSeg39
+.abs_section_30                    1   N/I       0x30       0x30   .absSeg40
+.abs_section_35                    1   N/I       0x35       0x35   .absSeg41
+.abs_section_38                    1   N/I       0x38       0x38   .absSeg42
+.abs_section_3b                    1   N/I       0x3B       0x3B   .absSeg43
+.abs_section_40                    1   N/I       0x40       0x40   .absSeg44
+.abs_section_41                    1   N/I       0x41       0x41   .absSeg45
+.abs_section_42                    1   N/I       0x42       0x42   .absSeg46
+.abs_section_43                    1   N/I       0x43       0x43   .absSeg47
+.abs_section_44                    1   N/I       0x44       0x44   .absSeg48
+.abs_section_45                    1   N/I       0x45       0x45   .absSeg49
+.abs_section_46                    1   N/I       0x46       0x46   .absSeg50
+.abs_section_47                    1   N/I       0x47       0x47   .absSeg51
+.abs_section_48                    1   N/I       0x48       0x48   .absSeg52
+.abs_section_49                    1   N/I       0x49       0x49   .absSeg53
+.abs_section_4a                    1   N/I       0x4A       0x4A   .absSeg54
+.abs_section_4b                    1   N/I       0x4B       0x4B   .absSeg55
+.abs_section_4e                    1   N/I       0x4E       0x4E   .absSeg56
+.abs_section_50                    1   N/I       0x50       0x50   .absSeg57
+.abs_section_51                    1   N/I       0x51       0x51   .absSeg58
+.abs_section_54                    1   N/I       0x54       0x54   .absSeg59
+.abs_section_58                    1   N/I       0x58       0x58   .absSeg60
+.abs_section_59                    1   N/I       0x59       0x59   .absSeg61
+.abs_section_5a                    1   N/I       0x5A       0x5A   .absSeg62
+.abs_section_5b                    1   N/I       0x5B       0x5B   .absSeg63
+.abs_section_5c                    1   N/I       0x5C       0x5C   .absSeg64
+.abs_section_60                    1   N/I       0x60       0x60   .absSeg65
+.abs_section_65                    1   N/I       0x65       0x65   .absSeg66
+.abs_section_68                    1   N/I       0x68       0x68   .absSeg67
+.abs_section_6b                    1   N/I       0x6B       0x6B   .absSeg68
+.abs_section_6e                    1   N/I       0x6E       0x6E   .absSeg69
+.abs_section_71                    1   N/I       0x71       0x71   .absSeg70
+.abs_section_1800                  1   N/I     0x1800     0x1800   .absSeg71
+.abs_section_1801                  1   N/I     0x1801     0x1801   .absSeg72
+.abs_section_1802                  1   N/I     0x1802     0x1802   .absSeg73
+.abs_section_1808                  1   N/I     0x1808     0x1808   .absSeg74
+.abs_section_1809                  1   N/I     0x1809     0x1809   .absSeg75
+.abs_section_180a                  1   N/I     0x180A     0x180A   .absSeg76
+.abs_section_1810                  1   N/I     0x1810     0x1810   .absSeg77
+.abs_section_1811                  1   N/I     0x1811     0x1811   .absSeg78
+.abs_section_1812                  1   N/I     0x1812     0x1812   .absSeg79
+.abs_section_1813                  1   N/I     0x1813     0x1813   .absSeg80
+.abs_section_1816                  1   N/I     0x1816     0x1816   .absSeg81
+.abs_section_1817                  1   N/I     0x1817     0x1817   .absSeg82
+.abs_section_1818                  1   N/I     0x1818     0x1818   .absSeg83
+.abs_section_1820                  1   N/I     0x1820     0x1820   .absSeg84
+.abs_section_1821                  1   N/I     0x1821     0x1821   .absSeg85
+.abs_section_1823                  1   N/I     0x1823     0x1823   .absSeg86
+.abs_section_1824                  1   N/I     0x1824     0x1824   .absSeg87
+.abs_section_1825                  1   N/I     0x1825     0x1825   .absSeg88
+.abs_section_1826                  1   N/I     0x1826     0x1826   .absSeg89
+.abs_section_18                    2   N/I       0x18       0x19   .absSeg90
+.abs_section_20                    2   N/I       0x20       0x21   .absSeg91
+.abs_section_31                    2   N/I       0x31       0x32   .absSeg92
+.abs_section_33                    2   N/I       0x33       0x34   .absSeg93
+.abs_section_36                    2   N/I       0x36       0x37   .absSeg94
+.abs_section_39                    2   N/I       0x39       0x3A   .absSeg95
+.abs_section_3c                    2   N/I       0x3C       0x3D   .absSeg96
+.abs_section_4c                    2   N/I       0x4C       0x4D   .absSeg97
+.abs_section_52                    2   N/I       0x52       0x53   .absSeg98
+.abs_section_61                    2   N/I       0x61       0x62   .absSeg99
+.abs_section_63                    2   N/I       0x63       0x64   .absSeg100
+.abs_section_66                    2   N/I       0x66       0x67   .absSeg101
+.abs_section_69                    2   N/I       0x69       0x6A   .absSeg102
+.abs_section_6c                    2   N/I       0x6C       0x6D   .absSeg103
+.abs_section_6f                    2   N/I       0x6F       0x70   .absSeg104
+.abs_section_72                    2   N/I       0x72       0x73   .absSeg105
+.abs_section_1814                  2   N/I     0x1814     0x1815   .absSeg106
+.abs_section_ffcc                 50     R     0xFFCC     0xFFFD   .absSeg107
+.bss                              30   R/W      0x101      0x11E   RAM
+.rodata1                        1086     R     0x3B9B     0x3FD8   ROM
+.startData                        14     R     0x189C     0x18A9   ROM
+.init                            112     R     0x182C     0x189B   ROM
+.common                          215   R/W      0x11F      0x1F5   RAM
+.stack                          1280   R/W      0x1F6      0x6F5   RAM
+.copy                              7     R     0x3FD9     0x3FDF   ROM
+.vectSeg108_vect                   2     R     0xFFFE     0xFFFF   .vectSeg108
+
+Summary of section sizes per section type:
+READ_ONLY (R):        27E8 (dec:    10216)
+READ_WRITE (R/W):      5F6 (dec:     1526)
+NO_INIT (N/I):          7C (dec:      124)
+
+*********************************************************************************************
+VECTOR-ALLOCATION SECTION
+    Address     InitValue   InitFunction
+---------------------------------------------------------------------------------------------
+     0xFFFE        0x1893   _Startup
+
+*********************************************************************************************
+OBJECT-ALLOCATION SECTION
+     Name               Module                 Addr   hSize   dSize     Ref    Section   RLIB
+---------------------------------------------------------------------------------------------
+MODULE:                 -- RTSHC08.C.o (ansiis.lib) --
+- PROCEDURES:
+     _PUSH_ARGS_L                              18AA      20      32       2   .text       
+     _ENTER_UNARY_L                            18CA      29      41       3   .text       
+     _ENTER_BINARY_L                           18F3      16      22       3   .text       
+     _ENTER_BINARY_L_RC                        1909      19      25       4   .text       
+     _k_is_k_plus_j_l                          1922      1E      30       2   .text       
+     _k_is_k_plus_j_i                          1940      12      18       3   .text       
+     _LMUL_k_is_k_mul_j                        1952      81     129       2   .text       
+     _LDIVMOD                                  19D3      A4     164       2   .text       
+     _LMODU_k_is_k_mod_j                       1A77       B      11       1   .text       
+     _LDIVU_k_is_k_div_j                       1A82      17      23       2   .text       
+     _LCMP_k_rel_j                             1A99      1F      31       2   .text       
+     _IMUL_STAR08                              1AB8      27      39       2   .text       
+     _LINC                                     1ADF      16      22      16   .text       
+     _LDEC                                     1AF5      1C      28       1   .text       
+     _LMUL                                     1B11       6       6       1   .text       
+     _LMUL_RC                                  1B17       6       6       1   .text       
+     _LDIVU                                    1B1D       6       6       1   .text       
+     _LDIVU_RC                                 1B23       6       6       1   .text       
+     _LMODU_RC                                 1B29       6       6       1   .text       
+     _LLSL                                     1B2F      16      22       1   .text       
+     _LCMP                                     1B45       6       6       1   .text       
+     _LCMP_RC                                  1B4B       6       6       4   .text       
+     _COPY_L                                   1B51      39      57       1   .text       
+     _POP32                                    1B8A      1A      26      19   .text       
+     _PUSH_CC                                  1BA4       F      15      10   .text       
+     _POP_CC                                   1BB3       F      15      10   .text       
+- VARIABLES:
+MODULE:                 -- STRING.C.o (ansiis.lib) --
+- PROCEDURES:
+     strlen                                    1BC2      27      39       5   .text       
+     strcpy                                    1BE9      29      41       2   .text       
+     strcmp                                    1C12      3F      63       1   .text       
+- VARIABLES:
+MODULE:                 -- ascii_utilities.c.o --
+- PROCEDURES:
+     int2string                                1C51      55      85      12   .text       
+     UTILDec2Char                              1CA6       B      11       1   .text       
+     char2num                                  1CB1       A      10       1   .text       
+     String2Uint32                             1CBB      D7     215       8   .text       
+     trimWhiteSpace                            1D92      4F      79      12   .text       
+- VARIABLES:
+     STRING............1                       3B9B       B      11       1   .rodata1    
+MODULE:                 -- kbi.c.o --
+- PROCEDURES:
+     KBIisr                                    1DE1      5F      95       1   .text       
+     KBIInit                                   1E40       9       9       1   .text       
+- VARIABLES:
+MODULE:                 -- LCD.c.o --
+- PROCEDURES:
+     LCDFirstLine                              1E49      1D      29       1   .text       
+     LCDSecondLine                             1E66      1D      29       1   .text       
+     LCDClearDisplay                           1E83      1E      30       2   .text       
+     LCDWaitLong                               1EA1      2F      47       3   .text       
+     LCDWaitShort                              1ED0      16      22      15   .text       
+     LCDToggleEN                               1EE6       5       5      18   .text       
+     LCDInit                                   1EEB      8B     139       1   .text       
+     LCDWrite4bits                             1F76      28      40      18   .text       
+     LCDWriteString                            1F9E      49      73      10   .text       
+     LCDWriteChar                              1FE7      1C      28       2   .text       
+- VARIABLES:
+MODULE:                 -- ledFunctions.c.o --
+- PROCEDURES:
+     setLedsMode                               2003     15D     349      10   .text       
+     setLed                                    2160      C8     200      11   .text       
+- VARIABLES:
+MODULE:                 -- SCI.c.o --
+- PROCEDURES:
+     SCIInitGeneric                            2228      7E     126       1   .text       
+     Vscirx                                    22A6      1E      30       2   .text       
+     SCIStartTransmit                          22C4      10      16       1   .text       
+     SCITransmitStr                            22D4      30      48      50   .text       
+     SCIgets                                   2304      88     136       7   .text       
+- VARIABLES:
+     gu8SCIData                                 11F      80     128       4   .common     
+     gu8SCIDataFlag                             19F       1       1       3   .common     
+MODULE:                 -- mc9s08gb60.c.o --
+- PROCEDURES:
+- VARIABLES:
+     _PTAD                                        0       1       1       1   .abs_section_0
+     _PTAPE                                       1       1       1       4   .abs_section_1
+     _PTASE                                       2       1       1       0   .abs_section_2
+     _PTADD                                       3       1       1       0   .abs_section_3
+     _PTBD                                        4       1       1      26   .abs_section_4
+     _PTBPE                                       5       1       1       0   .abs_section_5
+     _PTBSE                                       6       1       1       0   .abs_section_6
+     _PTBDD                                       7       1       1       1   .abs_section_7
+     _PTCD                                        8       1       1       0   .abs_section_8
+     _PTCPE                                       9       1       1       0   .abs_section_9
+     _PTCSE                                       A       1       1       0   .abs_section_a
+     _PTCDD                                       B       1       1       0   .abs_section_b
+     _PTDD                                        C       1       1      86   .abs_section_c
+     _PTDPE                                       D       1       1       1   .abs_section_d
+     _PTDSE                                       E       1       1       0   .abs_section_e
+     _PTDDD                                       F       1       1       7   .abs_section_f
+     _PTED                                       10       1       1       4   .abs_section_10
+     _PTEPE                                      11       1       1       0   .abs_section_11
+     _PTESE                                      12       1       1       0   .abs_section_12
+     _PTEDD                                      13       1       1       1   .abs_section_13
+     _IRQSC                                      14       1       1       9   .abs_section_14
+     _KBI1SC                                     16       1       1       3   .abs_section_16
+     _KBI1PE                                     17       1       1       4   .abs_section_17
+     _SCI1C1                                     1A       1       1       0   .abs_section_1a
+     _SCI1C2                                     1B       1       1       1   .abs_section_1b
+     _SCI1S1                                     1C       1       1       3   .abs_section_1c
+     _SCI1S2                                     1D       1       1       0   .abs_section_1d
+     _SCI1C3                                     1E       1       1       0   .abs_section_1e
+     _SCI1D                                      1F       1       1       3   .abs_section_1f
+     _SCI2C1                                     22       1       1       0   .abs_section_22
+     _SCI2C2                                     23       1       1       1   .abs_section_23
+     _SCI2S1                                     24       1       1       0   .abs_section_24
+     _SCI2S2                                     25       1       1       0   .abs_section_25
+     _SCI2C3                                     26       1       1       0   .abs_section_26
+     _SCI2D                                      27       1       1       0   .abs_section_27
+     _SPI1C1                                     28       1       1       1   .abs_section_28
+     _SPI1C2                                     29       1       1       1   .abs_section_29
+     _SPI1BR                                     2A       1       1       1   .abs_section_2a
+     _SPI1S                                      2B       1       1       2   .abs_section_2b
+     _SPI1D                                      2D       1       1       5   .abs_section_2d
+     _TPM1SC                                     30       1       1       4   .abs_section_30
+     _TPM1C0SC                                   35       1       1       0   .abs_section_35
+     _TPM1C1SC                                   38       1       1       0   .abs_section_38
+     _TPM1C2SC                                   3B       1       1       0   .abs_section_3b
+     _PTFD                                       40       1       1       0   .abs_section_40
+     _PTFPE                                      41       1       1       0   .abs_section_41
+     _PTFSE                                      42       1       1       0   .abs_section_42
+     _PTFDD                                      43       1       1       0   .abs_section_43
+     _PTGD                                       44       1       1       0   .abs_section_44
+     _PTGPE                                      45       1       1       0   .abs_section_45
+     _PTGSE                                      46       1       1       0   .abs_section_46
+     _PTGDD                                      47       1       1       0   .abs_section_47
+     _ICGC1                                      48       1       1       1   .abs_section_48
+     _ICGC2                                      49       1       1       3   .abs_section_49
+     _ICGS1                                      4A       1       1       1   .abs_section_4a
+     _ICGS2                                      4B       1       1       0   .abs_section_4b
+     _ICGTRM                                     4E       1       1       0   .abs_section_4e
+     _ATD1C                                      50       1       1       0   .abs_section_50
+     _ATD1SC                                     51       1       1       0   .abs_section_51
+     _ATD1PE                                     54       1       1       0   .abs_section_54
+     _IIC1A                                      58       1       1       0   .abs_section_58
+     _IIC1F                                      59       1       1       0   .abs_section_59
+     _IIC1C                                      5A       1       1       0   .abs_section_5a
+     _IIC1S                                      5B       1       1       0   .abs_section_5b
+     _IIC1D                                      5C       1       1       0   .abs_section_5c
+     _TPM2SC                                     60       1       1       0   .abs_section_60
+     _TPM2C0SC                                   65       1       1       0   .abs_section_65
+     _TPM2C1SC                                   68       1       1       0   .abs_section_68
+     _TPM2C2SC                                   6B       1       1       0   .abs_section_6b
+     _TPM2C3SC                                   6E       1       1       0   .abs_section_6e
+     _TPM2C4SC                                   71       1       1       0   .abs_section_71
+     _SRS                                      1800       1       1       0   .abs_section_1800
+     _SBDFR                                    1801       1       1       0   .abs_section_1801
+     _SOPT                                     1802       1       1       1   .abs_section_1802
+     _SRTISC                                   1808       1       1       0   .abs_section_1808
+     _SPMSC1                                   1809       1       1       0   .abs_section_1809
+     _SPMSC2                                   180A       1       1       0   .abs_section_180a
+     _DBGCAH                                   1810       1       1       0   .abs_section_1810
+     _DBGCAL                                   1811       1       1       0   .abs_section_1811
+     _DBGCBH                                   1812       1       1       0   .abs_section_1812
+     _DBGCBL                                   1813       1       1       0   .abs_section_1813
+     _DBGC                                     1816       1       1       0   .abs_section_1816
+     _DBGT                                     1817       1       1       0   .abs_section_1817
+     _DBGS                                     1818       1       1       0   .abs_section_1818
+     _FCDIV                                    1820       1       1       0   .abs_section_1820
+     _FOPT                                     1821       1       1       0   .abs_section_1821
+     _FCNFG                                    1823       1       1       0   .abs_section_1823
+     _FPROT                                    1824       1       1       0   .abs_section_1824
+     _FSTAT                                    1825       1       1       0   .abs_section_1825
+     _FCMD                                     1826       1       1       0   .abs_section_1826
+     _SCI1BD                                     18       2       2       2   .abs_section_18
+     _SCI2BD                                     20       2       2       2   .abs_section_20
+     _TPM1CNT                                    31       2       2       2   .abs_section_31
+     _TPM1MOD                                    33       2       2       1   .abs_section_33
+     _TPM1C0V                                    36       2       2       0   .abs_section_36
+     _TPM1C1V                                    39       2       2       0   .abs_section_39
+     _TPM1C2V                                    3C       2       2       0   .abs_section_3c
+     _ICGFLT                                     4C       2       2       0   .abs_section_4c
+     _ATD1R                                      52       2       2       0   .abs_section_52
+     _TPM2CNT                                    61       2       2       0   .abs_section_61
+     _TPM2MOD                                    63       2       2       0   .abs_section_63
+     _TPM2C0V                                    66       2       2       0   .abs_section_66
+     _TPM2C1V                                    69       2       2       0   .abs_section_69
+     _TPM2C2V                                    6C       2       2       0   .abs_section_6c
+     _TPM2C3V                                    6F       2       2       0   .abs_section_6f
+     _TPM2C4V                                    72       2       2       0   .abs_section_72
+     _DBGF                                     1814       2       2       0   .abs_section_1814
+MODULE:                 -- MC1321XNCB.c.o --
+- PROCEDURES:
+     RadioInit                                 238C      68     104       2   .text       
+- VARIABLES:
+MODULE:                 -- drivers.c.o --
+- PROCEDURES:
+     IRQIsr                                    23F4     228     552      10   .text       
+     SPIDrvWrite                               261C      45      69      66   .text       
+     SPIDrvRead                                2661      55      85      29   .text       
+     SPIDrvRead2                               26B6      6D     109       1   .text       
+     RAMDrvWriteTx                             2723     107     263       3   .text       
+     RAMDrvReadRx                              282A     141     321       3   .text       
+- VARIABLES:
+     psDrvRxPacket                              1A0       2       2       5   .common     
+MODULE:                 -- MC13192_hw_config.c.o --
+- PROCEDURES:
+     MC13192DisableInterrupts                  296B       7       7       6   .text       
+     MC13192RestoreInterrupts                  2972       3       3       6   .text       
+- VARIABLES:
+MODULE:                 -- mcu_hw_config.c.o --
+- PROCEDURES:
+     UseExternalClock                          2975      12      18       1   .text       
+     GPIOInit                                  2987      1B      27       1   .text       
+     MCUInit                                   29A2      6D     109       1   .text       
+     IRQPinLow                                 2A0F       8       8       1   .text       
+     AssertCE                                  2A17       3       3       5   .text       
+     DeAssertCE                                2A1A       3       3       5   .text       
+     RTXENDeAssert                             2A1D       3       3       6   .text       
+     RTXENAssert                               2A20       3       3       2   .text       
+- VARIABLES:
+MODULE:                 -- mcu_spi_config.c.o --
+- PROCEDURES:
+     SPIInit                                   2A23       8       8       1   .text       
+     SPIWaitTransferDone                       2A2B       7       7      23   .text       
+     SPIClearRecieveStatReg                    2A32       3       3       5   .text       
+     SPIClearRecieveDataReg                    2A35       3       3      18   .text       
+     SPISendChar                               2A38       3       3      23   .text       
+     SPIRead                                   2A3B       3       3       5   .text       
+     SPIReadMSB                                2A3E       3       3       3   .text       
+     SPIReadLSB                                2A41       5       5       2   .text       
+- VARIABLES:
+MODULE:                 -- simple_mac.c.o --
+- PROCEDURES:
+     MCPSDataRequest                           2A46       3       3       1   .text       
+     MCPSDataRequestWithoutLoad                2A49       3       3       1   .text       
+     MLMESetChannelRequest                     2A4C       3       3       1   .text       
+     MLMERXEnableRequest                       2A4F      33      51       1   .text       
+     MLMERXDisableRequest                      2A82       D      13       1   .text       
+     MLMESetMC13192ClockRate                   2A8F       3       3       1   .text       
+     MLMELinkQuality                           2A92       3       3       3   .text       
+     MLMEMC13192PAOutputAdjust                 2A95       3       3       3   .text       
+     MLMETestMode                              2A98     1DB     475      13   .text       
+- VARIABLES:
+MODULE:                 -- simple_phy.c.o --
+- PROCEDURES:
+     PLMEPhyReset                              2C73      10      16       1   .text       
+     PDDataRequest                             2C83      1C      28       1   .text       
+     PDDataRequestWithoutLoad                  2C9F      19      25       1   .text       
+     PDDataIndication                          2CB8      13      19       1   .text       
+     PLMESetChannelRequest                     2CCB     195     405      25   .text       
+     PLMESetTrxStateRequest                    2E60      7F     127       9   .text       
+     PLMELinkQuality                           2EDF       F      15       1   .text       
+     PLMESetMC13192ClockRate                   2EEE      2E      46       1   .text       
+     PLMESetTimeRequest                        2F1C      3E      62       1   .text       
+     PLMEEnableMC13192Timer1                   2F5A      24      36       1   .text       
+     PLMEDisableMC13192Timer1                  2F7E      12      18       1   .text       
+     PLMEMC13192ResetIndication                2F90       3       3       1   .text       
+     PLMEMC13192PAOutputAdjust                 2F93      57      87       1   .text       
+     PLMELoadPRBS9                             2FEA      88     136       1   .text       
+- VARIABLES:
+     gsPhyOptions                               1A2       4       4      10   .common     
+MODULE:                 -- smac_per_rx.c.o --
+- PROCEDURES:
+     main                                      3072     A47    2631      51   .text       
+     MCPSDataIndication                        3AB9      41      65       1   .text       
+     MLMEMC13192ResetIndication                3AFA       7       7       1   .text       
+     app_init                                  3B01      21      33       1   .text       
+- VARIABLES:
+     STRING......Firmware.para.t.1             3BA6      1D      29       1   .rodata1    
+     STRING..Operando.no.canal..2              3BC3      14      20       1   .rodata1    
+     STRING....3                               3BD7       3       3       1   .rodata1    
+     STRING.Firmware.TESTE.4                   3BDA       F      15       1   .rodata1    
+     STRING.802.15.4.5                         3BE9       9       9       1   .rodata1    
+     STRING...Selecione.qual.fir.6             3BF2      2C      44       1   .rodata1    
+     STRING....1..Portadora.modu.7             3C1E      1B      27       1   .rodata1    
+     STRING....2..Portadora.nao..8             3C39      1F      31       1   .rodata1    
+     STRING....3..Transmissor...9              3C58      14      20       1   .rodata1    
+     STRING....4..Receptor...10                3C6C      11      17       1   .rodata1    
+     STRING...Opcao..11                        3C7D       9       9       1   .rodata1    
+     STRING...Iniciando.em.modo..12            3C86      2C      44       1   .rodata1    
+     STRING...Iniciando.em.modo..13            3CB2      30      48       1   .rodata1    
+     STRING...Iniciando.em.modo..14            3CE2      25      37       1   .rodata1    
+     STRING...Iniciando.em.modo..15            3D07      22      34       1   .rodata1    
+     STRING.Portadora.16                       3D29       A      10       1   .rodata1    
+     STRING.modulada.17                        3D33       9       9       1   .rodata1    
+     STRING.Portadora.18                       3D3C       A      10       1   .rodata1    
+     STRING.nao.modulada.19                    3D46       D      13       1   .rodata1    
+     STRING.Transmissor.20                     3D53       C      12       1   .rodata1    
+     STRING..21                                3D5F       1       1       1   .rodata1    
+     STRING...Entre.com.o.numero.22            3D60      23      35       1   .rodata1    
+     STRING...Entre.com.o.tamanh.23            3D83      2C      44       1   .rodata1    
+     STRING...Entre.com.o.interv.24            3DAF      32      50       1   .rodata1    
+     STRING...Entre.com.quantas..25            3DE1      37      55       1   .rodata1    
+     STRING...Entre.com.a.potenc.26            3E18      3D      61       1   .rodata1    
+     STRING...Numero.de.pacotes..27            3E55      15      21       1   .rodata1    
+     STRING...Tamanho.dos.pacote.28            3E6A      17      23       1   .rodata1    
+     STRING...Intervalo.entre.os.29            3E81      1E      30       1   .rodata1    
+     STRING...Executar.o.testes..30            3E9F      15      21       1   .rodata1    
+     STRING...Potencia.de.transm.31            3EB4      1B      27       1   .rodata1    
+     STRING...Tecle..ENTER..para.32            3ECF      26      38       1   .rodata1    
+     STRING...Iniciando.o.teste..33            3EF5      1C      28       1   .rodata1    
+     STRING...34                               3F11       2       2       1   .rodata1    
+     STRING...Iniciando.transmis.35            3F13      1D      29       1   .rodata1    
+     STRING...N..36                            3F30       5       5       1   .rodata1    
+     STRING..L..37                             3F35       4       4       1   .rodata1    
+     STRING...Transmissao.encerr.38            3F39      1B      27       1   .rodata1    
+     STRING.Receptor.39                        3F54       9       9       1   .rodata1    
+     STRING..40                                3F5D       1       1       1   .rodata1    
+     STRING...Iniciando.receptor.41            3F5E      1A      26       1   .rodata1    
+     STRING...N..42                            3F78       5       5       1   .rodata1    
+     STRING..L..43                             3F7D       4       4       1   .rodata1    
+     STRING..LQI...44                          3F81       7       7       1   .rodata1    
+     STRING...Good..45                         3F88       8       8       1   .rodata1    
+     STRING...46                               3F90       2       2       1   .rodata1    
+     STRING...Histograma.RSSI.47               3F92      12      18       1   .rodata1    
+     STRING......48                            3FA4       5       5       1   .rodata1    
+     STRING....49                              3FA9       3       3       1   .rodata1    
+     STRING.DONEDONE.50                        3FAC       9       9       1   .rodata1    
+     STRING...CRC.ERROR..........51            3FB5      24      36       1   .rodata1    
+     gu8Channel                                 100       1       1       1   .data       
+     app_status                                 101       2       2       8   .bss        
+     gu16Events                                 103       2       2      10   .bss        
+     packet_count                               105       4       4       8   .bss        
+     packet_number                              109       4       4       8   .bss        
+     packet_size                                10D       4       4       7   .bss        
+     packet_interval                            111       4       4       6   .bss        
+     packet_repeat                              115       4       4      10   .bss        
+     packet_power                               119       4       4       2   .bss        
+     gu8RTxMode                                 1A6       1       1      27   .common     
+     link_quality                               1A7       1       1       4   .common     
+     expectedString                             1A8      1E      30       2   .common     
+     packet_histogramy                          1C6      28      40      16   .common     
+     opcao                                      1EE       4       4       4   .common     
+MODULE:                 -- Start08.c.o --
+- PROCEDURES:
+     Init                                      182C      67     103       1   .init       
+     _Startup                                  1893       9       9       0   .init       
+- VARIABLES:
+     _startupData                              189C       6       6       4   .startData  
+- LABELS:
+     __SEG_END_SSTACK                           6F6       0       0       1               
+MODULE:                 -- vectortable.c.o --
+- PROCEDURES:
+     UnimplementedISR                          3B22       3       3      20   .text       
+- VARIABLES:
+     _vect                                     FFCC      32      50       0   .abs_section_ffcc
+MODULE:                 -- timer.c.o --
+- PROCEDURES:
+     IRQTimer1                                 3B25      3F      63       1   .text       
+     delaySymbols                              3B64      21      33       2   .text       
+     delaySeconds                              3B85      14      20       5   .text       
+     delay                                     3B99       2       2       9   .text       
+- VARIABLES:
+     gu16msTimer                                11D       2       2      10   .bss        
+     gu16timerEvent                             1F2       4       4      12   .common     
+
+*********************************************************************************************
+MODULE STATISTIC
+  Name                                      Data   Code  Const
+---------------------------------------------------------------------------------------------
+  RTSHC08.C.o (ansiis.lib)                     0    792      0
+  STRING.C.o (ansiis.lib)                      0    143      0
+  ascii_utilities.c.o                          0    400     11
+  kbi.c.o                                      0    104      0
+  LCD.c.o                                      0    442      0
+  ledFunctions.c.o                             0    549      0
+  SCI.c.o                                    129    356      0
+  mc9s08gb60.c.o                             124      0      0
+  MC1321XNCB.c.o                               0    104      0
+  drivers.c.o                                  2   1399      0
+  MC13192_hw_config.c.o                        0     10      0
+  mcu_hw_config.c.o                            0    174      0
+  mcu_spi_config.c.o                           0     35      0
+  simple_mac.c.o                               0    557      0
+  simple_phy.c.o                               4   1023      0
+  smac_per_rx.c.o                            105   2736   1075
+  Start08.c.o                                  0    112      0
+  vectortable.c.o                              0      3     50
+  timer.c.o                                    6    118      0
+  other                                     1280     16      7
+
+*********************************************************************************************
+SECTION USE IN OBJECT-ALLOCATION SECTION
+---------------------------------------------------------------------------------------------
+SECTION: ".text"
+  _PUSH_ARGS_L _ENTER_UNARY_L _ENTER_BINARY_L _ENTER_BINARY_L_RC 
+  _k_is_k_plus_j_l _k_is_k_plus_j_i _LMUL_k_is_k_mul_j _LDIVMOD 
+  _LMODU_k_is_k_mod_j _LDIVU_k_is_k_div_j _LCMP_k_rel_j _IMUL_STAR08 _LINC 
+  _LDEC _LMUL _LMUL_RC _LDIVU _LDIVU_RC _LMODU_RC _LLSL _LCMP _LCMP_RC _COPY_L 
+  _POP32 _PUSH_CC _POP_CC strlen strcpy strcmp int2string UTILDec2Char char2num 
+  String2Uint32 trimWhiteSpace KBIisr KBIInit LCDFirstLine LCDSecondLine 
+  LCDClearDisplay LCDWaitLong LCDWaitShort LCDToggleEN LCDInit LCDWrite4bits 
+  LCDWriteString LCDWriteChar setLedsMode setLed SCIInitGeneric Vscirx 
+  SCIStartTransmit SCITransmitStr SCIgets RadioInit IRQIsr SPIDrvWrite 
+  SPIDrvRead SPIDrvRead2 RAMDrvWriteTx RAMDrvReadRx MC13192DisableInterrupts 
+  MC13192RestoreInterrupts UseExternalClock GPIOInit MCUInit IRQPinLow AssertCE 
+  DeAssertCE RTXENDeAssert RTXENAssert SPIInit SPIWaitTransferDone 
+  SPIClearRecieveStatReg SPIClearRecieveDataReg SPISendChar SPIRead SPIReadMSB 
+  SPIReadLSB MCPSDataRequest MCPSDataRequestWithoutLoad MLMESetChannelRequest 
+  MLMERXEnableRequest MLMERXDisableRequest MLMESetMC13192ClockRate 
+  MLMELinkQuality MLMEMC13192PAOutputAdjust MLMETestMode PLMEPhyReset 
+  PDDataRequest PDDataRequestWithoutLoad PDDataIndication PLMESetChannelRequest 
+  PLMESetTrxStateRequest PLMELinkQuality PLMESetMC13192ClockRate 
+  PLMESetTimeRequest PLMEEnableMC13192Timer1 PLMEDisableMC13192Timer1 
+  PLMEMC13192ResetIndication PLMEMC13192PAOutputAdjust PLMELoadPRBS9 main 
+  MCPSDataIndication MLMEMC13192ResetIndication app_init UnimplementedISR 
+  IRQTimer1 delaySymbols delaySeconds delay 
+SECTION: ".data"
+  gu8Channel 
+SECTION: ".bss"
+  app_status gu16Events packet_count packet_number packet_size packet_interval 
+  packet_repeat packet_power gu16msTimer 
+SECTION: ".init"
+  Init _Startup 
+SECTION: ".rodata1"
+  STRING............1 STRING......Firmware.para.t.1 
+  STRING..Operando.no.canal..2 STRING....3 STRING.Firmware.TESTE.4 
+  STRING.802.15.4.5 STRING...Selecione.qual.fir.6 STRING....1..Portadora.modu.7 
+  STRING....2..Portadora.nao..8 STRING....3..Transmissor...9 
+  STRING....4..Receptor...10 STRING...Opcao..11 STRING...Iniciando.em.modo..12 
+  STRING...Iniciando.em.modo..13 STRING...Iniciando.em.modo..14 
+  STRING...Iniciando.em.modo..15 STRING.Portadora.16 STRING.modulada.17 
+  STRING.Portadora.18 STRING.nao.modulada.19 STRING.Transmissor.20 STRING..21 
+  STRING...Entre.com.o.numero.22 STRING...Entre.com.o.tamanh.23 
+  STRING...Entre.com.o.interv.24 STRING...Entre.com.quantas..25 
+  STRING...Entre.com.a.potenc.26 STRING...Numero.de.pacotes..27 
+  STRING...Tamanho.dos.pacote.28 STRING...Intervalo.entre.os.29 
+  STRING...Executar.o.testes..30 STRING...Potencia.de.transm.31 
+  STRING...Tecle..ENTER..para.32 STRING...Iniciando.o.teste..33 STRING...34 
+  STRING...Iniciando.transmis.35 STRING...N..36 STRING..L..37 
+  STRING...Transmissao.encerr.38 STRING.Receptor.39 STRING..40 
+  STRING...Iniciando.receptor.41 STRING...N..42 STRING..L..43 STRING..LQI...44 
+  STRING...Good..45 STRING...46 STRING...Histograma.RSSI.47 STRING......48 
+  STRING....49 STRING.DONEDONE.50 STRING...CRC.ERROR..........51 
+SECTION: ".common"
+  gu8SCIData gu8SCIDataFlag psDrvRxPacket gsPhyOptions gu8RTxMode link_quality 
+  expectedString packet_histogramy opcao gu16timerEvent 
+SECTION: ".abs_section_0"
+  _PTAD 
+SECTION: ".abs_section_1"
+  _PTAPE 
+SECTION: ".abs_section_2"
+  _PTASE 
+SECTION: ".abs_section_3"
+  _PTADD 
+SECTION: ".abs_section_4"
+  _PTBD 
+SECTION: ".abs_section_5"
+  _PTBPE 
+SECTION: ".abs_section_6"
+  _PTBSE 
+SECTION: ".abs_section_7"
+  _PTBDD 
+SECTION: ".abs_section_8"
+  _PTCD 
+SECTION: ".abs_section_9"
+  _PTCPE 
+SECTION: ".abs_section_a"
+  _PTCSE 
+SECTION: ".abs_section_b"
+  _PTCDD 
+SECTION: ".abs_section_c"
+  _PTDD 
+SECTION: ".abs_section_d"
+  _PTDPE 
+SECTION: ".abs_section_e"
+  _PTDSE 
+SECTION: ".abs_section_f"
+  _PTDDD 
+SECTION: ".abs_section_10"
+  _PTED 
+SECTION: ".abs_section_11"
+  _PTEPE 
+SECTION: ".abs_section_12"
+  _PTESE 
+SECTION: ".abs_section_13"
+  _PTEDD 
+SECTION: ".abs_section_14"
+  _IRQSC 
+SECTION: ".abs_section_16"
+  _KBI1SC 
+SECTION: ".abs_section_17"
+  _KBI1PE 
+SECTION: ".abs_section_1a"
+  _SCI1C1 
+SECTION: ".abs_section_1b"
+  _SCI1C2 
+SECTION: ".abs_section_1c"
+  _SCI1S1 
+SECTION: ".abs_section_1d"
+  _SCI1S2 
+SECTION: ".abs_section_1e"
+  _SCI1C3 
+SECTION: ".abs_section_1f"
+  _SCI1D 
+SECTION: ".abs_section_22"
+  _SCI2C1 
+SECTION: ".abs_section_23"
+  _SCI2C2 
+SECTION: ".abs_section_24"
+  _SCI2S1 
+SECTION: ".abs_section_25"
+  _SCI2S2 
+SECTION: ".abs_section_26"
+  _SCI2C3 
+SECTION: ".abs_section_27"
+  _SCI2D 
+SECTION: ".abs_section_28"
+  _SPI1C1 
+SECTION: ".abs_section_29"
+  _SPI1C2 
+SECTION: ".abs_section_2a"
+  _SPI1BR 
+SECTION: ".abs_section_2b"
+  _SPI1S 
+SECTION: ".abs_section_2d"
+  _SPI1D 
+SECTION: ".abs_section_30"
+  _TPM1SC 
+SECTION: ".abs_section_35"
+  _TPM1C0SC 
+SECTION: ".abs_section_38"
+  _TPM1C1SC 
+SECTION: ".abs_section_3b"
+  _TPM1C2SC 
+SECTION: ".abs_section_40"
+  _PTFD 
+SECTION: ".abs_section_41"
+  _PTFPE 
+SECTION: ".abs_section_42"
+  _PTFSE 
+SECTION: ".abs_section_43"
+  _PTFDD 
+SECTION: ".abs_section_44"
+  _PTGD 
+SECTION: ".abs_section_45"
+  _PTGPE 
+SECTION: ".abs_section_46"
+  _PTGSE 
+SECTION: ".abs_section_47"
+  _PTGDD 
+SECTION: ".abs_section_48"
+  _ICGC1 
+SECTION: ".abs_section_49"
+  _ICGC2 
+SECTION: ".abs_section_4a"
+  _ICGS1 
+SECTION: ".abs_section_4b"
+  _ICGS2 
+SECTION: ".abs_section_4e"
+  _ICGTRM 
+SECTION: ".abs_section_50"
+  _ATD1C 
+SECTION: ".abs_section_51"
+  _ATD1SC 
+SECTION: ".abs_section_54"
+  _ATD1PE 
+SECTION: ".abs_section_58"
+  _IIC1A 
+SECTION: ".abs_section_59"
+  _IIC1F 
+SECTION: ".abs_section_5a"
+  _IIC1C 
+SECTION: ".abs_section_5b"
+  _IIC1S 
+SECTION: ".abs_section_5c"
+  _IIC1D 
+SECTION: ".abs_section_60"
+  _TPM2SC 
+SECTION: ".abs_section_65"
+  _TPM2C0SC 
+SECTION: ".abs_section_68"
+  _TPM2C1SC 
+SECTION: ".abs_section_6b"
+  _TPM2C2SC 
+SECTION: ".abs_section_6e"
+  _TPM2C3SC 
+SECTION: ".abs_section_71"
+  _TPM2C4SC 
+SECTION: ".abs_section_1800"
+  _SRS 
+SECTION: ".abs_section_1801"
+  _SBDFR 
+SECTION: ".abs_section_1802"
+  _SOPT 
+SECTION: ".abs_section_1808"
+  _SRTISC 
+SECTION: ".abs_section_1809"
+  _SPMSC1 
+SECTION: ".abs_section_180a"
+  _SPMSC2 
+SECTION: ".abs_section_1810"
+  _DBGCAH 
+SECTION: ".abs_section_1811"
+  _DBGCAL 
+SECTION: ".abs_section_1812"
+  _DBGCBH 
+SECTION: ".abs_section_1813"
+  _DBGCBL 
+SECTION: ".abs_section_1816"
+  _DBGC 
+SECTION: ".abs_section_1817"
+  _DBGT 
+SECTION: ".abs_section_1818"
+  _DBGS 
+SECTION: ".abs_section_1820"
+  _FCDIV 
+SECTION: ".abs_section_1821"
+  _FOPT 
+SECTION: ".abs_section_1823"
+  _FCNFG 
+SECTION: ".abs_section_1824"
+  _FPROT 
+SECTION: ".abs_section_1825"
+  _FSTAT 
+SECTION: ".abs_section_1826"
+  _FCMD 
+SECTION: ".abs_section_18"
+  _SCI1BD 
+SECTION: ".abs_section_20"
+  _SCI2BD 
+SECTION: ".abs_section_31"
+  _TPM1CNT 
+SECTION: ".abs_section_33"
+  _TPM1MOD 
+SECTION: ".abs_section_36"
+  _TPM1C0V 
+SECTION: ".abs_section_39"
+  _TPM1C1V 
+SECTION: ".abs_section_3c"
+  _TPM1C2V 
+SECTION: ".abs_section_4c"
+  _ICGFLT 
+SECTION: ".abs_section_52"
+  _ATD1R 
+SECTION: ".abs_section_61"
+  _TPM2CNT 
+SECTION: ".abs_section_63"
+  _TPM2MOD 
+SECTION: ".abs_section_66"
+  _TPM2C0V 
+SECTION: ".abs_section_69"
+  _TPM2C1V 
+SECTION: ".abs_section_6c"
+  _TPM2C2V 
+SECTION: ".abs_section_6f"
+  _TPM2C3V 
+SECTION: ".abs_section_72"
+  _TPM2C4V 
+SECTION: ".abs_section_1814"
+  _DBGF 
+SECTION: ".abs_section_ffcc"
+  _vect 
+
+*********************************************************************************************
+OBJECT LIST SORTED BY ADDRESS
+     Name                                      Addr   hSize   dSize     Ref    Section   RLIB
+---------------------------------------------------------------------------------------------
+     _PTAD                                        0       1       1       1   .abs_section_0
+     _PTAPE                                       1       1       1       4   .abs_section_1
+     _PTASE                                       2       1       1       0   .abs_section_2
+     _PTADD                                       3       1       1       0   .abs_section_3
+     _PTBD                                        4       1       1      26   .abs_section_4
+     _PTBPE                                       5       1       1       0   .abs_section_5
+     _PTBSE                                       6       1       1       0   .abs_section_6
+     _PTBDD                                       7       1       1       1   .abs_section_7
+     _PTCD                                        8       1       1       0   .abs_section_8
+     _PTCPE                                       9       1       1       0   .abs_section_9
+     _PTCSE                                       A       1       1       0   .abs_section_a
+     _PTCDD                                       B       1       1       0   .abs_section_b
+     _PTDD                                        C       1       1      86   .abs_section_c
+     _PTDPE                                       D       1       1       1   .abs_section_d
+     _PTDSE                                       E       1       1       0   .abs_section_e
+     _PTDDD                                       F       1       1       7   .abs_section_f
+     _PTED                                       10       1       1       4   .abs_section_10
+     _PTEPE                                      11       1       1       0   .abs_section_11
+     _PTESE                                      12       1       1       0   .abs_section_12
+     _PTEDD                                      13       1       1       1   .abs_section_13
+     _IRQSC                                      14       1       1       9   .abs_section_14
+     _KBI1SC                                     16       1       1       3   .abs_section_16
+     _KBI1PE                                     17       1       1       4   .abs_section_17
+     _SCI1BD                                     18       2       2       2   .abs_section_18
+     _SCI1C1                                     1A       1       1       0   .abs_section_1a
+     _SCI1C2                                     1B       1       1       1   .abs_section_1b
+     _SCI1S1                                     1C       1       1       3   .abs_section_1c
+     _SCI1S2                                     1D       1       1       0   .abs_section_1d
+     _SCI1C3                                     1E       1       1       0   .abs_section_1e
+     _SCI1D                                      1F       1       1       3   .abs_section_1f
+     _SCI2BD                                     20       2       2       2   .abs_section_20
+     _SCI2C1                                     22       1       1       0   .abs_section_22
+     _SCI2C2                                     23       1       1       1   .abs_section_23
+     _SCI2S1                                     24       1       1       0   .abs_section_24
+     _SCI2S2                                     25       1       1       0   .abs_section_25
+     _SCI2C3                                     26       1       1       0   .abs_section_26
+     _SCI2D                                      27       1       1       0   .abs_section_27
+     _SPI1C1                                     28       1       1       1   .abs_section_28
+     _SPI1C2                                     29       1       1       1   .abs_section_29
+     _SPI1BR                                     2A       1       1       1   .abs_section_2a
+     _SPI1S                                      2B       1       1       2   .abs_section_2b
+     _SPI1D                                      2D       1       1       5   .abs_section_2d
+     _TPM1SC                                     30       1       1       4   .abs_section_30
+     _TPM1CNT                                    31       2       2       2   .abs_section_31
+     _TPM1MOD                                    33       2       2       1   .abs_section_33
+     _TPM1C0SC                                   35       1       1       0   .abs_section_35
+     _TPM1C0V                                    36       2       2       0   .abs_section_36
+     _TPM1C1SC                                   38       1       1       0   .abs_section_38
+     _TPM1C1V                                    39       2       2       0   .abs_section_39
+     _TPM1C2SC                                   3B       1       1       0   .abs_section_3b
+     _TPM1C2V                                    3C       2       2       0   .abs_section_3c
+     _PTFD                                       40       1       1       0   .abs_section_40
+     _PTFPE                                      41       1       1       0   .abs_section_41
+     _PTFSE                                      42       1       1       0   .abs_section_42
+     _PTFDD                                      43       1       1       0   .abs_section_43
+     _PTGD                                       44       1       1       0   .abs_section_44
+     _PTGPE                                      45       1       1       0   .abs_section_45
+     _PTGSE                                      46       1       1       0   .abs_section_46
+     _PTGDD                                      47       1       1       0   .abs_section_47
+     _ICGC1                                      48       1       1       1   .abs_section_48
+     _ICGC2                                      49       1       1       3   .abs_section_49
+     _ICGS1                                      4A       1       1       1   .abs_section_4a
+     _ICGS2                                      4B       1       1       0   .abs_section_4b
+     _ICGFLT                                     4C       2       2       0   .abs_section_4c
+     _ICGTRM                                     4E       1       1       0   .abs_section_4e
+     _ATD1C                                      50       1       1       0   .abs_section_50
+     _ATD1SC                                     51       1       1       0   .abs_section_51
+     _ATD1R                                      52       2       2       0   .abs_section_52
+     _ATD1PE                                     54       1       1       0   .abs_section_54
+     _IIC1A                                      58       1       1       0   .abs_section_58
+     _IIC1F                                      59       1       1       0   .abs_section_59
+     _IIC1C                                      5A       1       1       0   .abs_section_5a
+     _IIC1S                                      5B       1       1       0   .abs_section_5b
+     _IIC1D                                      5C       1       1       0   .abs_section_5c
+     _TPM2SC                                     60       1       1       0   .abs_section_60
+     _TPM2CNT                                    61       2       2       0   .abs_section_61
+     _TPM2MOD                                    63       2       2       0   .abs_section_63
+     _TPM2C0SC                                   65       1       1       0   .abs_section_65
+     _TPM2C0V                                    66       2       2       0   .abs_section_66
+     _TPM2C1SC                                   68       1       1       0   .abs_section_68
+     _TPM2C1V                                    69       2       2       0   .abs_section_69
+     _TPM2C2SC                                   6B       1       1       0   .abs_section_6b
+     _TPM2C2V                                    6C       2       2       0   .abs_section_6c
+     _TPM2C3SC                                   6E       1       1       0   .abs_section_6e
+     _TPM2C3V                                    6F       2       2       0   .abs_section_6f
+     _TPM2C4SC                                   71       1       1       0   .abs_section_71
+     _TPM2C4V                                    72       2       2       0   .abs_section_72
+     gu8Channel                                 100       1       1       1   .data       
+     app_status                                 101       2       2       8   .bss        
+     gu16Events                                 103       2       2      10   .bss        
+     packet_count                               105       4       4       8   .bss        
+     packet_number                              109       4       4       8   .bss        
+     packet_size                                10D       4       4       7   .bss        
+     packet_interval                            111       4       4       6   .bss        
+     packet_repeat                              115       4       4      10   .bss        
+     packet_power                               119       4       4       2   .bss        
+     gu16msTimer                                11D       2       2      10   .bss        
+     gu8SCIData                                 11F      80     128       4   .common     
+     gu8SCIDataFlag                             19F       1       1       3   .common     
+     psDrvRxPacket                              1A0       2       2       5   .common     
+     gsPhyOptions                               1A2       4       4      10   .common     
+     gu8RTxMode                                 1A6       1       1      27   .common     
+     link_quality                               1A7       1       1       4   .common     
+     expectedString                             1A8      1E      30       2   .common     
+     packet_histogramy                          1C6      28      40      16   .common     
+     opcao                                      1EE       4       4       4   .common     
+     gu16timerEvent                             1F2       4       4      12   .common     
+     _SRS                                      1800       1       1       0   .abs_section_1800
+     _SBDFR                                    1801       1       1       0   .abs_section_1801
+     _SOPT                                     1802       1       1       1   .abs_section_1802
+     _SRTISC                                   1808       1       1       0   .abs_section_1808
+     _SPMSC1                                   1809       1       1       0   .abs_section_1809
+     _SPMSC2                                   180A       1       1       0   .abs_section_180a
+     _DBGCAH                                   1810       1       1       0   .abs_section_1810
+     _DBGCAL                                   1811       1       1       0   .abs_section_1811
+     _DBGCBH                                   1812       1       1       0   .abs_section_1812
+     _DBGCBL                                   1813       1       1       0   .abs_section_1813
+     _DBGF                                     1814       2       2       0   .abs_section_1814
+     _DBGC                                     1816       1       1       0   .abs_section_1816
+     _DBGT                                     1817       1       1       0   .abs_section_1817
+     _DBGS                                     1818       1       1       0   .abs_section_1818
+     _FCDIV                                    1820       1       1       0   .abs_section_1820
+     _FOPT                                     1821       1       1       0   .abs_section_1821
+     _FCNFG                                    1823       1       1       0   .abs_section_1823
+     _FPROT                                    1824       1       1       0   .abs_section_1824
+     _FSTAT                                    1825       1       1       0   .abs_section_1825
+     _FCMD                                     1826       1       1       0   .abs_section_1826
+     Init                                      182C      67     103       1   .init       
+     _Startup                                  1893       9       9       0   .init       
+     _PUSH_ARGS_L                              18AA      20      32       2   .text       
+     _ENTER_UNARY_L                            18CA      29      41       3   .text       
+     _ENTER_BINARY_L                           18F3      16      22       3   .text       
+     _ENTER_BINARY_L_RC                        1909      19      25       4   .text       
+     _k_is_k_plus_j_l                          1922      1E      30       2   .text       
+     _k_is_k_plus_j_i                          1940      12      18       3   .text       
+     _LMUL_k_is_k_mul_j                        1952      81     129       2   .text       
+     _LDIVMOD                                  19D3      A4     164       2   .text       
+     _LMODU_k_is_k_mod_j                       1A77       B      11       1   .text       
+     _LDIVU_k_is_k_div_j                       1A82      17      23       2   .text       
+     _LCMP_k_rel_j                             1A99      1F      31       2   .text       
+     _IMUL_STAR08                              1AB8      27      39       2   .text       
+     _LINC                                     1ADF      16      22      16   .text       
+     _LDEC                                     1AF5      1C      28       1   .text       
+     _LMUL                                     1B11       6       6       1   .text       
+     _LMUL_RC                                  1B17       6       6       1   .text       
+     _LDIVU                                    1B1D       6       6       1   .text       
+     _LDIVU_RC                                 1B23       6       6       1   .text       
+     _LMODU_RC                                 1B29       6       6       1   .text       
+     _LLSL                                     1B2F      16      22       1   .text       
+     _LCMP                                     1B45       6       6       1   .text       
+     _LCMP_RC                                  1B4B       6       6       4   .text       
+     _COPY_L                                   1B51      39      57       1   .text       
+     _POP32                                    1B8A      1A      26      19   .text       
+     _PUSH_CC                                  1BA4       F      15      10   .text       
+     _POP_CC                                   1BB3       F      15      10   .text       
+     strlen                                    1BC2      27      39       5   .text       
+     strcpy                                    1BE9      29      41       2   .text       
+     strcmp                                    1C12      3F      63       1   .text       
+     int2string                                1C51      55      85      12   .text       
+     UTILDec2Char                              1CA6       B      11       1   .text       
+     char2num                                  1CB1       A      10       1   .text       
+     String2Uint32                             1CBB      D7     215       8   .text       
+     trimWhiteSpace                            1D92      4F      79      12   .text       
+     KBIisr                                    1DE1      5F      95       1   .text       
+     KBIInit                                   1E40       9       9       1   .text       
+     LCDFirstLine                              1E49      1D      29       1   .text       
+     LCDSecondLine                             1E66      1D      29       1   .text       
+     LCDClearDisplay                           1E83      1E      30       2   .text       
+     LCDWaitLong                               1EA1      2F      47       3   .text       
+     LCDWaitShort                              1ED0      16      22      15   .text       
+     LCDToggleEN                               1EE6       5       5      18   .text       
+     LCDInit                                   1EEB      8B     139       1   .text       
+     LCDWrite4bits                             1F76      28      40      18   .text       
+     LCDWriteString                            1F9E      49      73      10   .text       
+     LCDWriteChar                              1FE7      1C      28       2   .text       
+     setLedsMode                               2003     15D     349      10   .text       
+     setLed                                    2160      C8     200      11   .text       
+     SCIInitGeneric                            2228      7E     126       1   .text       
+     Vscirx                                    22A6      1E      30       2   .text       
+     SCIStartTransmit                          22C4      10      16       1   .text       
+     SCITransmitStr                            22D4      30      48      50   .text       
+     SCIgets                                   2304      88     136       7   .text       
+     RadioInit                                 238C      68     104       2   .text       
+     IRQIsr                                    23F4     228     552      10   .text       
+     SPIDrvWrite                               261C      45      69      66   .text       
+     SPIDrvRead                                2661      55      85      29   .text       
+     SPIDrvRead2                               26B6      6D     109       1   .text       
+     RAMDrvWriteTx                             2723     107     263       3   .text       
+     RAMDrvReadRx                              282A     141     321       3   .text       
+     MC13192DisableInterrupts                  296B       7       7       6   .text       
+     MC13192RestoreInterrupts                  2972       3       3       6   .text       
+     UseExternalClock                          2975      12      18       1   .text       
+     GPIOInit                                  2987      1B      27       1   .text       
+     MCUInit                                   29A2      6D     109       1   .text       
+     IRQPinLow                                 2A0F       8       8       1   .text       
+     AssertCE                                  2A17       3       3       5   .text       
+     DeAssertCE                                2A1A       3       3       5   .text       
+     RTXENDeAssert                             2A1D       3       3       6   .text       
+     RTXENAssert                               2A20       3       3       2   .text       
+     SPIInit                                   2A23       8       8       1   .text       
+     SPIWaitTransferDone                       2A2B       7       7      23   .text       
+     SPIClearRecieveStatReg                    2A32       3       3       5   .text       
+     SPIClearRecieveDataReg                    2A35       3       3      18   .text       
+     SPISendChar                               2A38       3       3      23   .text       
+     SPIRead                                   2A3B       3       3       5   .text       
+     SPIReadMSB                                2A3E       3       3       3   .text       
+     SPIReadLSB                                2A41       5       5       2   .text       
+     MCPSDataRequest                           2A46       3       3       1   .text       
+     MCPSDataRequestWithoutLoad                2A49       3       3       1   .text       
+     MLMESetChannelRequest                     2A4C       3       3       1   .text       
+     MLMERXEnableRequest                       2A4F      33      51       1   .text       
+     MLMERXDisableRequest                      2A82       D      13       1   .text       
+     MLMESetMC13192ClockRate                   2A8F       3       3       1   .text       
+     MLMELinkQuality                           2A92       3       3       3   .text       
+     MLMEMC13192PAOutputAdjust                 2A95       3       3       3   .text       
+     MLMETestMode                              2A98     1DB     475      13   .text       
+     PLMEPhyReset                              2C73      10      16       1   .text       
+     PDDataRequest                             2C83      1C      28       1   .text       
+     PDDataRequestWithoutLoad                  2C9F      19      25       1   .text       
+     PDDataIndication                          2CB8      13      19       1   .text       
+     PLMESetChannelRequest                     2CCB     195     405      25   .text       
+     PLMESetTrxStateRequest                    2E60      7F     127       9   .text       
+     PLMELinkQuality                           2EDF       F      15       1   .text       
+     PLMESetMC13192ClockRate                   2EEE      2E      46       1   .text       
+     PLMESetTimeRequest                        2F1C      3E      62       1   .text       
+     PLMEEnableMC13192Timer1                   2F5A      24      36       1   .text       
+     PLMEDisableMC13192Timer1                  2F7E      12      18       1   .text       
+     PLMEMC13192ResetIndication                2F90       3       3       1   .text       
+     PLMEMC13192PAOutputAdjust                 2F93      57      87       1   .text       
+     PLMELoadPRBS9                             2FEA      88     136       1   .text       
+     main                                      3072     A47    2631      51   .text       
+     MCPSDataIndication                        3AB9      41      65       1   .text       
+     MLMEMC13192ResetIndication                3AFA       7       7       1   .text       
+     app_init                                  3B01      21      33       1   .text       
+     UnimplementedISR                          3B22       3       3      20   .text       
+     IRQTimer1                                 3B25      3F      63       1   .text       
+     delaySymbols                              3B64      21      33       2   .text       
+     delaySeconds                              3B85      14      20       5   .text       
+     delay                                     3B99       2       2       9   .text       
+     STRING............1                       3B9B       B      11       1   .rodata1    
+     STRING......Firmware.para.t.1             3BA6      1D      29       1   .rodata1    
+     STRING..Operando.no.canal..2              3BC3      14      20       1   .rodata1    
+     STRING....3                               3BD7       3       3       1   .rodata1    
+     STRING.Firmware.TESTE.4                   3BDA       F      15       1   .rodata1    
+     STRING.802.15.4.5                         3BE9       9       9       1   .rodata1    
+     STRING...Selecione.qual.fir.6             3BF2      2C      44       1   .rodata1    
+     STRING....1..Portadora.modu.7             3C1E      1B      27       1   .rodata1    
+     STRING....2..Portadora.nao..8             3C39      1F      31       1   .rodata1    
+     STRING....3..Transmissor...9              3C58      14      20       1   .rodata1    
+     STRING....4..Receptor...10                3C6C      11      17       1   .rodata1    
+     STRING...Opcao..11                        3C7D       9       9       1   .rodata1    
+     STRING...Iniciando.em.modo..12            3C86      2C      44       1   .rodata1    
+     STRING...Iniciando.em.modo..13            3CB2      30      48       1   .rodata1    
+     STRING...Iniciando.em.modo..14            3CE2      25      37       1   .rodata1    
+     STRING...Iniciando.em.modo..15            3D07      22      34       1   .rodata1    
+     STRING.Portadora.16                       3D29       A      10       1   .rodata1    
+     STRING.modulada.17                        3D33       9       9       1   .rodata1    
+     STRING.Portadora.18                       3D3C       A      10       1   .rodata1    
+     STRING.nao.modulada.19                    3D46       D      13       1   .rodata1    
+     STRING.Transmissor.20                     3D53       C      12       1   .rodata1    
+     STRING..21                                3D5F       1       1       1   .rodata1    
+     STRING...Entre.com.o.numero.22            3D60      23      35       1   .rodata1    
+     STRING...Entre.com.o.tamanh.23            3D83      2C      44       1   .rodata1    
+     STRING...Entre.com.o.interv.24            3DAF      32      50       1   .rodata1    
+     STRING...Entre.com.quantas..25            3DE1      37      55       1   .rodata1    
+     STRING...Entre.com.a.potenc.26            3E18      3D      61       1   .rodata1    
+     STRING...Numero.de.pacotes..27            3E55      15      21       1   .rodata1    
+     STRING...Tamanho.dos.pacote.28            3E6A      17      23       1   .rodata1    
+     STRING...Intervalo.entre.os.29            3E81      1E      30       1   .rodata1    
+     STRING...Executar.o.testes..30            3E9F      15      21       1   .rodata1    
+     STRING...Potencia.de.transm.31            3EB4      1B      27       1   .rodata1    
+     STRING...Tecle..ENTER..para.32            3ECF      26      38       1   .rodata1    
+     STRING...Iniciando.o.teste..33            3EF5      1C      28       1   .rodata1    
+     STRING...34                               3F11       2       2       1   .rodata1    
+     STRING...Iniciando.transmis.35            3F13      1D      29       1   .rodata1    
+     STRING...N..36                            3F30       5       5       1   .rodata1    
+     STRING..L..37                             3F35       4       4       1   .rodata1    
+     STRING...Transmissao.encerr.38            3F39      1B      27       1   .rodata1    
+     STRING.Receptor.39                        3F54       9       9       1   .rodata1    
+     STRING..40                                3F5D       1       1       1   .rodata1    
+     STRING...Iniciando.receptor.41            3F5E      1A      26       1   .rodata1    
+     STRING...N..42                            3F78       5       5       1   .rodata1    
+     STRING..L..43                             3F7D       4       4       1   .rodata1    
+     STRING..LQI...44                          3F81       7       7       1   .rodata1    
+     STRING...Good..45                         3F88       8       8       1   .rodata1    
+     STRING...46                               3F90       2       2       1   .rodata1    
+     STRING...Histograma.RSSI.47               3F92      12      18       1   .rodata1    
+     STRING......48                            3FA4       5       5       1   .rodata1    
+     STRING....49                              3FA9       3       3       1   .rodata1    
+     STRING.DONEDONE.50                        3FAC       9       9       1   .rodata1    
+     STRING...CRC.ERROR..........51            3FB5      24      36       1   .rodata1    
+     _vect                                     FFCC      32      50       0   .abs_section_ffcc
+
+*********************************************************************************************
+UNUSED-OBJECTS SECTION
+---------------------------------------------------------------------------------------------
+NOT USED PROCEDURES
+RTSHC08.C.o (ansiis.lib):
+  _PUSH_ARGS_D _ENTER_UNARY_L64 _ENTER_UNARY_L64_4 _ENTER_BINARY_L_LC 
+  _ENTER_BINARY_L64 _ENTER_BINARY_L64_LC _ENTER_BINARY_L64_RC _IDIVMOD 
+  _SPLITSIGN _LADD_k_is_k_plus_j _LSUB_k_is_k_minus_j _LAND_k_is_k_and_j 
+  _LOR_k_is_k_or_j _LXOR_k_is_k_xor_j _NEG_L_HX _ABS_L_HX _SPLITSIGN_L 
+  _LMODS_k_is_k_mod_j _LDIVS_k_is_k_div_j _CMP24_k_rel_j _BMULS _BDIVS _BMODS 
+  _IDIVS_STAR08 _IDIVU_STAR08 _IMODS_STAR08 _IMODU_STAR08 _IDIVU_8 _IMODU_8 
+  _IASR _ILSR _ILSL _ICMP _LNEG _LNOT _LADD _LADD_RC _LSUB _LSUB_LC _LSUB_RC 
+  _LAND _LAND_RC _LOR _LOR_RC _LXOR _LXOR_RC _LDIVS _LDIVS_LC _LDIVS_RC 
+  _LDIVU_LC _LMODS _LMODS_LC _LMODS_RC _LMODU _LMODU_LC _LASR _LLSR _CMP24 
+  _CMP24_RC _COPY _POP64 _STORE32 _STORE64 _SEXT8_32 _SEXT16_32 _CALL_STAR08 
+  _CALL_STAR08_FAR _Jump_Table_Addr _Jump_Table_Offset _Jump_Table_Header_Addr 
+  _Jump_Table_Header_Offset _Search_Table_16_Addr _Search_Table_16_Offset 
+  _Search_Table_8_Addr _Search_Table_8_Offset _CONV_FAR_TO_NEAR 
+  _CONV_FAR_TO_LINEAR _CONV_LINEAR_TO_FAR 
+STRING.C.o (ansiis.lib):
+  strerror memchr memcmp memcpy2 memcpy _memcpy_8bitCount memmove memset 
+  _memset_clear_8bitCount strset strcat strncat strncpy strncmp strchr strrchr 
+  strspn strcspn strpbrk strstr strtok strcoll strxfrm 
+ascii_utilities.c.o:
+  String2Uint16 UTILInt2String Uint32ToHexString 
+LCD.c.o:
+  LCDWriteCommand 
+SCI.c.o:
+  SCIInit SCITransmitArray SCITransmitFormattedArray 
+MC13192_hw_config.c.o:
+  MC13192Init 
+mcu_hw_config.c.o:
+  UseMcuClock MC13192Restart MC13192ContReset MC13192Wake 
+simple_mac.c.o:
+  MLMEHibernateRequest MLMEDozeRequest MLMEWakeRequest 
+  MLMESetMC13192TmrPrescale MLMEEnergyDetect MLMEMC13192SoftReset 
+  MLMEMC13192XtalAdjust MLMEMC13192FEGainAdjust MLMEScanRequest 
+  MLMEGetRficVersion 
+simple_phy.c.o:
+  PLMEHibernateRequest PLMEDozeRequest PLMEWakeRequest PLMEEnergyDetect 
+  PLMECCARequest PLMEGetTimeRequest PLMESetMC13192TmrPrescale 
+  PLMEMC13192SoftReset PLMEMC13192XtalAdjust PLMEMC13192FEGainAdjust 
+  PLMEGetRficVersion PLMEEnablePromiscuousMode PLMEDisablePromiscuousMode 
+NOT USED VARIABLES
+RTSHC08.C.o (ansiis.lib):
+  _PowOfTwo_8 _PowOfTwo_16 _PowOfTwo_32 errno 
+STRING.C.o (ansiis.lib):
+  STRING..1 next.2 
+ascii_utilities.c.o:
+  STRING............2 STRING.00000000000.3 
+drivers.c.o:
+  gu8IRQValue sDrvCCAReading u16StatusContent 
+simple_mac.c.o:
+  Freescale_Copyright Firmware_Database_Label SMAC_Version 
+simple_phy.c.o:
+  SPHY_Version u16StatusContent 
+smac_per_rx.c.o:
+  led_status 
+
+*********************************************************************************************
+COPYDOWN SECTION
+---------------------------------------------------------------------------------------------
+------- ROM-ADDRESS: 0x3FD9 ---- SIZE       4 ---
+Filling bytes inserted
+ 00010100
+------- ROM-ADDRESS: 0x3FDD ---- RAM-ADDRESS: 0x100 ---- SIZE       1 ---
+Name of initialized Object : gu8Channel
+ 0F
+------- ROM-ADDRESS: 0x3FDE ---- SIZE       2 ---
+Filling bytes inserted
+ 0000
+
+*********************************************************************************************
+OBJECT-DEPENDENCIES SECTION
+---------------------------------------------------------------------------------------------
+Init                      USES _startupData _COPY_L 
+_Startup                  USES __SEG_END_SSTACK Init main 
+_ENTER_BINARY_L           USES _PUSH_ARGS_L 
+_ENTER_BINARY_L_RC        USES _PUSH_ARGS_L 
+_LMUL_k_is_k_mul_j        USES _k_is_k_plus_j_l _k_is_k_plus_j_i 
+_LMODU_k_is_k_mod_j       USES _LDIVMOD 
+_LDIVU_k_is_k_div_j       USES _LDIVMOD 
+_LINC                     USES _ENTER_UNARY_L 
+_LDEC                     USES _ENTER_UNARY_L 
+_LMUL                     USES _ENTER_BINARY_L _LMUL_k_is_k_mul_j 
+_LMUL_RC                  USES _ENTER_BINARY_L_RC _LMUL_k_is_k_mul_j 
+_LDIVU                    USES _ENTER_BINARY_L _LDIVU_k_is_k_div_j 
+_LDIVU_RC                 USES _ENTER_BINARY_L_RC _LDIVU_k_is_k_div_j 
+_LMODU_RC                 USES _ENTER_BINARY_L_RC _LMODU_k_is_k_mod_j 
+_LLSL                     USES _ENTER_UNARY_L 
+_LCMP                     USES _ENTER_BINARY_L _LCMP_k_rel_j 
+_LCMP_RC                  USES _ENTER_BINARY_L_RC _LCMP_k_rel_j 
+int2string                USES STRING............1 strcpy _LMODU_RC 
+                                UTILDec2Char _LDIVU_RC _POP32 _PUSH_CC _POP_CC 
+String2Uint32             USES strlen String2Uint32 char2num _LMUL _POP32 
+                                _IMUL_STAR08 
+trimWhiteSpace            USES strlen strcpy 
+KBIisr                    USES _PTAD gu16timerEvent gu16msTimer gu16Events 
+                                _KBI1SC 
+KBIInit                   USES _KBI1PE 
+LCDFirstLine              USES _PTBD LCDWrite4bits LCDToggleEN LCDWaitShort 
+LCDSecondLine             USES _PTBD LCDWrite4bits LCDToggleEN LCDWaitShort 
+LCDClearDisplay           USES _PTBD LCDWrite4bits LCDToggleEN LCDWaitShort 
+                                LCDWaitLong 
+LCDToggleEN               USES _PTBD 
+LCDInit                   USES LCDWaitLong _PTBDD _PTBD LCDWrite4bits 
+                                LCDToggleEN LCDWaitShort LCDClearDisplay 
+LCDWrite4bits             USES _PTBD 
+LCDWriteString            USES LCDSecondLine LCDFirstLine strlen LCDWriteChar 
+LCDWriteChar              USES _PTBD LCDWrite4bits LCDToggleEN LCDWaitShort 
+setLedsMode               USES setLedsMode setLed delay _PTDD int2string 
+                                trimWhiteSpace _PUSH_CC _POP_CC strlen 
+setLed                    USES setLed _PTDD 
+SCIInitGeneric            USES _LLSL _LDIVU _SCI1BD _SCI1C2 _SCI2BD _SCI2C2 
+Vscirx                    USES _SCI1S1 _SCI1D gu8SCIData gu8SCIDataFlag 
+SCIStartTransmit          USES _SCI1S1 _SCI1D 
+SCITransmitStr            USES strlen SCIStartTransmit 
+SCIgets                   USES SCITransmitStr gu8SCIDataFlag gu8SCIData 
+RadioInit                 USES SPIDrvWrite SPIDrvRead gu8RTxMode 
+IRQIsr                    USES _IRQSC SPIDrvRead IRQPinLow gsPhyOptions 
+                                gu8RTxMode _PUSH_CC _POP_CC IRQIsr SPIDrvWrite 
+                                PLMEMC13192ResetIndication psDrvRxPacket RTXENDeAssert SPIDrvRead2 
+                                RTXENAssert PDDataIndication 
+SPIDrvWrite               USES SPIClearRecieveStatReg SPIClearRecieveDataReg 
+                                MC13192DisableInterrupts AssertCE SPISendChar SPIWaitTransferDone 
+                                DeAssertCE MC13192RestoreInterrupts 
+SPIDrvRead                USES SPIClearRecieveStatReg SPIClearRecieveDataReg 
+                                MC13192DisableInterrupts AssertCE SPISendChar SPIWaitTransferDone 
+                                SPIReadMSB SPIRead DeAssertCE MC13192RestoreInterrupts 
+SPIDrvRead2               USES SPIClearRecieveStatReg SPIClearRecieveDataReg 
+                                MC13192DisableInterrupts AssertCE SPISendChar SPIWaitTransferDone 
+                                SPIReadMSB SPIReadLSB DeAssertCE MC13192RestoreInterrupts 
+RAMDrvWriteTx             USES gsPhyOptions SPIDrvRead SPIDrvWrite 
+                                SPIClearRecieveStatReg SPIClearRecieveDataReg 
+                                MC13192DisableInterrupts AssertCE SPISendChar SPIWaitTransferDone 
+                                _PUSH_CC _POP_CC DeAssertCE MC13192RestoreInterrupts 
+RAMDrvReadRx              USES gsPhyOptions SPIDrvRead RAMDrvReadRx 
+                                SPIClearRecieveStatReg SPIClearRecieveDataReg 
+                                MC13192DisableInterrupts AssertCE SPISendChar SPIWaitTransferDone 
+                                SPIRead DeAssertCE MC13192RestoreInterrupts 
+MC13192DisableInterrupts  USES _IRQSC 
+MC13192RestoreInterrupts  USES _IRQSC 
+UseExternalClock          USES _ICGC1 _ICGS1 _ICGC2 
+GPIOInit                  USES _PTDPE _PTED _PTDD _PTEDD _PTDDD 
+MCUInit                   USES _SOPT gu8RTxMode _TPM1SC _TPM1CNT GPIOInit 
+                                SPIInit _IRQSC _PTDD SPIDrvRead PLMEPhyReset 
+AssertCE                  USES _PTED 
+DeAssertCE                USES _PTED 
+RTXENDeAssert             USES _PTDD 
+RTXENAssert               USES _PTDD 
+SPIInit                   USES _SPI1C1 _SPI1C2 _SPI1BR 
+SPIWaitTransferDone       USES _SPI1S 
+SPIClearRecieveStatReg    USES _SPI1S 
+SPIClearRecieveDataReg    USES _SPI1D 
+SPISendChar               USES _SPI1D 
+SPIRead                   USES _SPI1D 
+SPIReadMSB                USES _SPI1D 
+SPIReadLSB                USES _SPI1D 
+MCPSDataRequest           USES PDDataRequest 
+MCPSDataRequestWithoutLoad USES PDDataRequestWithoutLoad 
+MLMESetChannelRequest     USES PLMESetChannelRequest 
+MLMERXEnableRequest       USES psDrvRxPacket PLMESetTimeRequest 
+                                PLMEEnableMC13192Timer1 PLMESetTrxStateRequest 
+MLMERXDisableRequest      USES PLMEDisableMC13192Timer1 PLMESetTrxStateRequest 
+MLMESetMC13192ClockRate   USES PLMESetMC13192ClockRate 
+MLMELinkQuality           USES PLMELinkQuality 
+MLMEMC13192PAOutputAdjust USES PLMEMC13192PAOutputAdjust 
+MLMETestMode              USES MLMETestMode PLMELoadPRBS9 
+                                MC13192DisableInterrupts RTXENDeAssert gu8RTxMode 
+                                MC13192RestoreInterrupts _LINC _POP32 PLMESetTrxStateRequest SPIDrvRead 
+                                SPIDrvWrite 
+PLMEPhyReset              USES gsPhyOptions 
+PDDataRequest             USES gu8RTxMode RAMDrvWriteTx PLMESetTrxStateRequest 
+PDDataRequestWithoutLoad  USES gu8RTxMode PLMESetTrxStateRequest 
+PDDataIndication          USES psDrvRxPacket RAMDrvReadRx MCPSDataIndication 
+PLMESetChannelRequest     USES PLMESetChannelRequest SPIDrvWrite 
+PLMESetTrxStateRequest    USES RTXENDeAssert SPIDrvRead gu8RTxMode SPIDrvWrite 
+                                RTXENAssert 
+PLMELinkQuality           USES SPIDrvRead 
+PLMESetMC13192ClockRate   USES SPIDrvRead SPIDrvWrite 
+PLMESetTimeRequest        USES SPIDrvWrite SPIDrvRead 
+PLMEEnableMC13192Timer1   USES SPIDrvWrite 
+PLMEDisableMC13192Timer1  USES SPIDrvWrite 
+PLMEMC13192ResetIndication USES MLMEMC13192ResetIndication 
+PLMEMC13192PAOutputAdjust USES SPIDrvRead SPIDrvWrite 
+PLMELoadPRBS9             USES RAMDrvWriteTx 
+main                      USES MCUInit RadioInit app_init SCIInitGeneric 
+                                KBIInit _KBI1SC MLMESetMC13192ClockRate 
+                                UseExternalClock MLMESetChannelRequest 
+                                MLMEMC13192PAOutputAdjust LCDInit LCDClearDisplay setLedsMode 
+                                expectedString _LINC _POP32 app_status 
+                                STRING......Firmware.para.t.1 SCITransmitStr STRING..Operando.no.canal..2 
+                                gu8Channel int2string trimWhiteSpace STRING....3 
+                                STRING.Firmware.TESTE.4 LCDWriteString STRING.802.15.4.5 main _PTDD 
+                                delaySeconds STRING...Selecione.qual.fir.6 
+                                STRING....1..Portadora.modu.7 STRING....2..Portadora.nao..8 
+                                STRING....3..Transmissor...9 STRING....4..Receptor...10 STRING...Opcao..11 
+                                SCIgets opcao String2Uint32 _LCMP_RC _PUSH_CC _POP_CC 
+                                STRING...Iniciando.em.modo..12 STRING...Iniciando.em.modo..13 
+                                STRING...Iniciando.em.modo..14 STRING...Iniciando.em.modo..15 
+                                STRING.Portadora.16 STRING.modulada.17 MLMETestMode 
+                                STRING.Portadora.18 STRING.nao.modulada.19 STRING.Transmissor.20 
+                                STRING..21 STRING...Entre.com.o.numero.22 
+                                STRING...Entre.com.o.tamanh.23 STRING...Entre.com.o.interv.24 
+                                STRING...Entre.com.quantas..25 STRING...Entre.com.a.potenc.26 
+                                STRING...Numero.de.pacotes..27 packet_number STRING...Tamanho.dos.pacote.28 
+                                packet_size STRING...Intervalo.entre.os.29 packet_interval 
+                                STRING...Executar.o.testes..30 packet_repeat STRING...Potencia.de.transm.31 
+                                packet_power STRING...Tecle..ENTER..para.32 
+                                STRING...Iniciando.o.teste..33 STRING...34 _LCMP RAMDrvWriteTx 
+                                STRING...Iniciando.transmis.35 STRING...N..36 STRING..L..37 
+                                MCPSDataRequestWithoutLoad delay STRING...Transmissao.encerr.38 
+                                MCPSDataRequest _LDEC STRING.Receptor.39 STRING..40 
+                                STRING...Iniciando.receptor.41 packet_count packet_histogramy 
+                                MLMERXEnableRequest MLMELinkQuality link_quality STRING...N..42 
+                                STRING..L..43 STRING..LQI...44 STRING...Good..45 STRING...46 
+                                STRING...Histograma.RSSI.47 STRING......48 _LMUL_RC STRING....49 
+                                gu16Events gu16timerEvent MLMERXDisableRequest 
+MCPSDataIndication        USES app_status STRING.DONEDONE.50 strcmp 
+                                STRING...CRC.ERROR..........51 SCITransmitStr 
+MLMEMC13192ResetIndication USES app_status 
+app_init                  USES _PTDD _PTDDD _PTAPE _TPM1MOD _TPM1SC 
+IRQTimer1                 USES gu16msTimer gu16timerEvent gu16Events _TPM1SC 
+delaySymbols              USES gu16msTimer 
+delaySeconds              USES _IMUL_STAR08 delaySymbols 
+delay                     USES delaySymbols 
+_vect                     USES UnimplementedISR KBIisr Vscirx IRQTimer1 IRQIsr 
+
+*********************************************************************************************
+DEPENDENCY TREE
+*********************************************************************************************
+ main and _Startup Group
+ | 
+ +- main                
+ |  | 
+ |  +- MCUInit             
+ |  |  | 
+ |  |  +- GPIOInit            
+ |  |  |    
+ |  |  +- SPIInit             
+ |  |  |    
+ |  |  +- SPIDrvRead          
+ |  |  |  | 
+ |  |  |  +- SPIClearRecieveStatReg
+ |  |  |  |    
+ |  |  |  +- SPIClearRecieveDataReg
+ |  |  |  |    
+ |  |  |  +- MC13192DisableInterrupts
+ |  |  |  |    
+ |  |  |  +- AssertCE            
+ |  |  |  |    
+ |  |  |  +- SPISendChar         
+ |  |  |  |    
+ |  |  |  +- SPIWaitTransferDone 
+ |  |  |  |    
+ |  |  |  +- SPIReadMSB          
+ |  |  |  |    
+ |  |  |  +- SPIRead             
+ |  |  |  |    
+ |  |  |  +- DeAssertCE          
+ |  |  |  |    
+ |  |  |  +- MC13192RestoreInterrupts
+ |  |  |       
+ |  |  +- PLMEPhyReset        
+ |  |       
+ |  +- RadioInit           
+ |  |  | 
+ |  |  +- SPIDrvWrite         
+ |  |  |  | 
+ |  |  |  +- SPIClearRecieveStatReg (see above)
+ |  |  |  |  
+ |  |  |  +- SPIClearRecieveDataReg (see above)
+ |  |  |  |  
+ |  |  |  +- MC13192DisableInterrupts (see above)
+ |  |  |  |  
+ |  |  |  +- AssertCE             (see above)
+ |  |  |  |  
+ |  |  |  +- SPISendChar          (see above)
+ |  |  |  |  
+ |  |  |  +- SPIWaitTransferDone  (see above)
+ |  |  |  |  
+ |  |  |  +- DeAssertCE           (see above)
+ |  |  |  |  
+ |  |  |  +- MC13192RestoreInterrupts (see above)
+ |  |  |     
+ |  |  +- SPIDrvRead           (see above)
+ |  |     
+ |  +- app_init            
+ |  |    
+ |  +- SCIInitGeneric      
+ |  |  | 
+ |  |  +- _LLSL               
+ |  |  |  | 
+ |  |  |  +- _ENTER_UNARY_L      
+ |  |  |       
+ |  |  +- _LDIVU              
+ |  |     | 
+ |  |     +- _ENTER_BINARY_L     
+ |  |     |  | 
+ |  |     |  +- _PUSH_ARGS_L        
+ |  |     |       
+ |  |     +- _LDIVU_k_is_k_div_j 
+ |  |        | 
+ |  |        +- _LDIVMOD            
+ |  |             
+ |  +- KBIInit             
+ |  |    
+ |  +- MLMESetMC13192ClockRate
+ |  |  | 
+ |  |  +- PLMESetMC13192ClockRate
+ |  |     | 
+ |  |     +- SPIDrvRead           (see above)
+ |  |     |  
+ |  |     +- SPIDrvWrite          (see above)
+ |  |        
+ |  +- UseExternalClock    
+ |  |    
+ |  +- MLMESetChannelRequest
+ |  |  | 
+ |  |  +- PLMESetChannelRequest
+ |  |     | 
+ |  |     +- SPIDrvWrite          (see above)
+ |  |        
+ |  +- MLMEMC13192PAOutputAdjust
+ |  |  | 
+ |  |  +- PLMEMC13192PAOutputAdjust
+ |  |     | 
+ |  |     +- SPIDrvRead           (see above)
+ |  |     |  
+ |  |     +- SPIDrvWrite          (see above)
+ |  |        
+ |  +- LCDInit             
+ |  |  | 
+ |  |  +- LCDWaitLong         
+ |  |  |    
+ |  |  +- LCDWrite4bits       
+ |  |  |    
+ |  |  +- LCDToggleEN         
+ |  |  |    
+ |  |  +- LCDWaitShort        
+ |  |  |    
+ |  |  +- LCDClearDisplay     
+ |  |     | 
+ |  |     +- LCDWrite4bits        (see above)
+ |  |     |  
+ |  |     +- LCDToggleEN          (see above)
+ |  |     |  
+ |  |     +- LCDWaitShort         (see above)
+ |  |     |  
+ |  |     +- LCDWaitLong          (see above)
+ |  |        
+ |  +- LCDClearDisplay      (see above)
+ |  |  
+ |  +- setLedsMode         
+ |  |  | 
+ |  |  +- setLed              
+ |  |  |    
+ |  |  +- delay               
+ |  |  |  | 
+ |  |  |  +- delaySymbols        
+ |  |  |       
+ |  |  +- int2string          
+ |  |  |  | 
+ |  |  |  +- strcpy              
+ |  |  |  |    
+ |  |  |  +- _LMODU_RC           
+ |  |  |  |  | 
+ |  |  |  |  +- _ENTER_BINARY_L_RC  
+ |  |  |  |  |  | 
+ |  |  |  |  |  +- _PUSH_ARGS_L         (see above)
+ |  |  |  |  |     
+ |  |  |  |  +- _LMODU_k_is_k_mod_j 
+ |  |  |  |     | 
+ |  |  |  |     +- _LDIVMOD             (see above)
+ |  |  |  |        
+ |  |  |  +- UTILDec2Char        
+ |  |  |  |    
+ |  |  |  +- _LDIVU_RC           
+ |  |  |  |  | 
+ |  |  |  |  +- _ENTER_BINARY_L_RC   (see above)
+ |  |  |  |  |  
+ |  |  |  |  +- _LDIVU_k_is_k_div_j  (see above)
+ |  |  |  |     
+ |  |  |  +- _POP32              
+ |  |  |  |    
+ |  |  |  +- _PUSH_CC            
+ |  |  |  |    
+ |  |  |  +- _POP_CC             
+ |  |  |       
+ |  |  +- trimWhiteSpace      
+ |  |  |  | 
+ |  |  |  +- strlen              
+ |  |  |  |    
+ |  |  |  +- strcpy               (see above)
+ |  |  |     
+ |  |  +- _PUSH_CC             (see above)
+ |  |  |  
+ |  |  +- _POP_CC              (see above)
+ |  |  |  
+ |  |  +- strlen               (see above)
+ |  |     
+ |  +- _LINC               
+ |  |  | 
+ |  |  +- _ENTER_UNARY_L       (see above)
+ |  |     
+ |  +- _POP32               (see above)
+ |  |  
+ |  +- SCITransmitStr      
+ |  |  | 
+ |  |  +- strlen               (see above)
+ |  |  |  
+ |  |  +- SCIStartTransmit    
+ |  |       
+ |  +- int2string           (see above)
+ |  |  
+ |  +- trimWhiteSpace       (see above)
+ |  |  
+ |  +- LCDWriteString      
+ |  |  | 
+ |  |  +- LCDSecondLine       
+ |  |  |  | 
+ |  |  |  +- LCDWrite4bits        (see above)
+ |  |  |  |  
+ |  |  |  +- LCDToggleEN          (see above)
+ |  |  |  |  
+ |  |  |  +- LCDWaitShort         (see above)
+ |  |  |     
+ |  |  +- LCDFirstLine        
+ |  |  |  | 
+ |  |  |  +- LCDWrite4bits        (see above)
+ |  |  |  |  
+ |  |  |  +- LCDToggleEN          (see above)
+ |  |  |  |  
+ |  |  |  +- LCDWaitShort         (see above)
+ |  |  |     
+ |  |  +- strlen               (see above)
+ |  |  |  
+ |  |  +- LCDWriteChar        
+ |  |     | 
+ |  |     +- LCDWrite4bits        (see above)
+ |  |     |  
+ |  |     +- LCDToggleEN          (see above)
+ |  |     |  
+ |  |     +- LCDWaitShort         (see above)
+ |  |        
+ |  +- delaySeconds        
+ |  |  | 
+ |  |  +- _IMUL_STAR08        
+ |  |  |    
+ |  |  +- delaySymbols         (see above)
+ |  |     
+ |  +- SCIgets             
+ |  |  | 
+ |  |  +- SCITransmitStr       (see above)
+ |  |     
+ |  +- String2Uint32       
+ |  |  | 
+ |  |  +- strlen               (see above)
+ |  |  |  
+ |  |  +- char2num            
+ |  |  |    
+ |  |  +- _LMUL               
+ |  |  |  | 
+ |  |  |  +- _ENTER_BINARY_L      (see above)
+ |  |  |  |  
+ |  |  |  +- _LMUL_k_is_k_mul_j  
+ |  |  |     | 
+ |  |  |     +- _k_is_k_plus_j_l    
+ |  |  |     |    
+ |  |  |     +- _k_is_k_plus_j_i    
+ |  |  |          
+ |  |  +- _POP32               (see above)
+ |  |  |  
+ |  |  +- _IMUL_STAR08         (see above)
+ |  |     
+ |  +- _LCMP_RC            
+ |  |  | 
+ |  |  +- _ENTER_BINARY_L_RC   (see above)
+ |  |  |  
+ |  |  +- _LCMP_k_rel_j       
+ |  |       
+ |  +- _PUSH_CC             (see above)
+ |  |  
+ |  +- _POP_CC              (see above)
+ |  |  
+ |  +- MLMETestMode        
+ |  |  | 
+ |  |  +- PLMELoadPRBS9       
+ |  |  |  | 
+ |  |  |  +- RAMDrvWriteTx       
+ |  |  |     | 
+ |  |  |     +- SPIDrvRead           (see above)
+ |  |  |     |  
+ |  |  |     +- SPIDrvWrite          (see above)
+ |  |  |     |  
+ |  |  |     +- SPIClearRecieveStatReg (see above)
+ |  |  |     |  
+ |  |  |     +- SPIClearRecieveDataReg (see above)
+ |  |  |     |  
+ |  |  |     +- MC13192DisableInterrupts (see above)
+ |  |  |     |  
+ |  |  |     +- AssertCE             (see above)
+ |  |  |     |  
+ |  |  |     +- SPISendChar          (see above)
+ |  |  |     |  
+ |  |  |     +- SPIWaitTransferDone  (see above)
+ |  |  |     |  
+ |  |  |     +- _PUSH_CC             (see above)
+ |  |  |     |  
+ |  |  |     +- _POP_CC              (see above)
+ |  |  |     |  
+ |  |  |     +- DeAssertCE           (see above)
+ |  |  |     |  
+ |  |  |     +- MC13192RestoreInterrupts (see above)
+ |  |  |        
+ |  |  +- MC13192DisableInterrupts (see above)
+ |  |  |  
+ |  |  +- RTXENDeAssert       
+ |  |  |    
+ |  |  +- MC13192RestoreInterrupts (see above)
+ |  |  |  
+ |  |  +- _LINC                (see above)
+ |  |  |  
+ |  |  +- _POP32               (see above)
+ |  |  |  
+ |  |  +- PLMESetTrxStateRequest
+ |  |  |  | 
+ |  |  |  +- RTXENDeAssert        (see above)
+ |  |  |  |  
+ |  |  |  +- SPIDrvRead           (see above)
+ |  |  |  |  
+ |  |  |  +- SPIDrvWrite          (see above)
+ |  |  |  |  
+ |  |  |  +- RTXENAssert         
+ |  |  |       
+ |  |  +- SPIDrvRead           (see above)
+ |  |  |  
+ |  |  +- SPIDrvWrite          (see above)
+ |  |     
+ |  +- _LCMP               
+ |  |  | 
+ |  |  +- _ENTER_BINARY_L      (see above)
+ |  |  |  
+ |  |  +- _LCMP_k_rel_j        (see above)
+ |  |     
+ |  +- RAMDrvWriteTx        (see above)
+ |  |  
+ |  +- MCPSDataRequestWithoutLoad
+ |  |  | 
+ |  |  +- PDDataRequestWithoutLoad
+ |  |     | 
+ |  |     +- PLMESetTrxStateRequest (see above)
+ |  |        
+ |  +- delay                (see above)
+ |  |  
+ |  +- MCPSDataRequest     
+ |  |  | 
+ |  |  +- PDDataRequest       
+ |  |     | 
+ |  |     +- RAMDrvWriteTx        (see above)
+ |  |     |  
+ |  |     +- PLMESetTrxStateRequest (see above)
+ |  |        
+ |  +- _LDEC               
+ |  |  | 
+ |  |  +- _ENTER_UNARY_L       (see above)
+ |  |     
+ |  +- MLMERXEnableRequest 
+ |  |  | 
+ |  |  +- PLMESetTimeRequest  
+ |  |  |  | 
+ |  |  |  +- SPIDrvWrite          (see above)
+ |  |  |  |  
+ |  |  |  +- SPIDrvRead           (see above)
+ |  |  |     
+ |  |  +- PLMEEnableMC13192Timer1
+ |  |  |  | 
+ |  |  |  +- SPIDrvWrite          (see above)
+ |  |  |     
+ |  |  +- PLMESetTrxStateRequest (see above)
+ |  |     
+ |  +- MLMELinkQuality     
+ |  |  | 
+ |  |  +- PLMELinkQuality     
+ |  |     | 
+ |  |     +- SPIDrvRead           (see above)
+ |  |        
+ |  +- _LMUL_RC            
+ |  |  | 
+ |  |  +- _ENTER_BINARY_L_RC   (see above)
+ |  |  |  
+ |  |  +- _LMUL_k_is_k_mul_j   (see above)
+ |  |     
+ |  +- MLMERXDisableRequest
+ |     | 
+ |     +- PLMEDisableMC13192Timer1
+ |     |  | 
+ |     |  +- SPIDrvWrite          (see above)
+ |     |     
+ |     +- PLMESetTrxStateRequest (see above)
+ |        
+ +- _Startup            
+    | 
+    +- Init                
+    |  | 
+    |  +- _COPY_L             
+    |       
+    +- main                 (see above)
+       
+ _vect               
+ | 
+ +- UnimplementedISR    
+ |    
+ +- KBIisr              
+ |    
+ +- Vscirx              
+ |    
+ +- IRQTimer1           
+ |    
+ +- IRQIsr              
+    | 
+    +- SPIDrvRead           (see above)
+    |  
+    +- IRQPinLow           
+    |    
+    +- _PUSH_CC             (see above)
+    |  
+    +- _POP_CC              (see above)
+    |  
+    +- SPIDrvWrite          (see above)
+    |  
+    +- PLMEMC13192ResetIndication
+    |  | 
+    |  +- MLMEMC13192ResetIndication
+    |       
+    +- RTXENDeAssert        (see above)
+    |  
+    +- SPIDrvRead2         
+    |  | 
+    |  +- SPIClearRecieveStatReg (see above)
+    |  |  
+    |  +- SPIClearRecieveDataReg (see above)
+    |  |  
+    |  +- MC13192DisableInterrupts (see above)
+    |  |  
+    |  +- AssertCE             (see above)
+    |  |  
+    |  +- SPISendChar          (see above)
+    |  |  
+    |  +- SPIWaitTransferDone  (see above)
+    |  |  
+    |  +- SPIReadMSB           (see above)
+    |  |  
+    |  +- SPIReadLSB          
+    |  |    
+    |  +- DeAssertCE           (see above)
+    |  |  
+    |  +- MC13192RestoreInterrupts (see above)
+    |     
+    +- RTXENAssert          (see above)
+    |  
+    +- PDDataIndication    
+       | 
+       +- RAMDrvReadRx        
+       |  | 
+       |  +- SPIDrvRead           (see above)
+       |  |  
+       |  +- SPIClearRecieveStatReg (see above)
+       |  |  
+       |  +- SPIClearRecieveDataReg (see above)
+       |  |  
+       |  +- MC13192DisableInterrupts (see above)
+       |  |  
+       |  +- AssertCE             (see above)
+       |  |  
+       |  +- SPISendChar          (see above)
+       |  |  
+       |  +- SPIWaitTransferDone  (see above)
+       |  |  
+       |  +- SPIRead              (see above)
+       |  |  
+       |  +- DeAssertCE           (see above)
+       |  |  
+       |  +- MC13192RestoreInterrupts (see above)
+       |     
+       +- MCPSDataIndication  
+          | 
+          +- strcmp              
+          |    
+          +- SCITransmitStr       (see above)
+             
+*********************************************************************************************
+STATISTIC SECTION
+---------------------------------------------------------------------------------------------
+
+ExeFile:
+--------
+Number of blocks to be downloaded: 6
+Total size of all blocks to be downloaded: 10216
+

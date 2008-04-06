@@ -1,0 +1,521 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  #include "ledFunctions.h"
+    2:  #include "ascii_utilities.h"
+    3:  #include <string.h>
+    4:  
+    5:  extern void delay(UINT16);
+    6:  /**************************************************************
+    7:  *    Function:     setLedsMode()
+    8:  *    Parameters: UINT8 mode, UINT16 value, UINT16 delay
+    9:  *    Return: none
+   10:  *
+   11:  *     Mode BINARY
+   12:  *     setLeds() turns on the LEDs for delay time.
+   13:  *     5 - lights LED2, 4
+   14:  *     7 - lisgts LED2,3,4...
+   15:  ***************************************************************/
+   16:  
+   17:  void setLedsMode(UINT8 u8mode, UINT16 u16value, UINT16 u16ledDelay, UINT8 flags) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 87       [2]             PSHA  
+  0003 a7f6     [2]             AIS   #-10
+   18:  
+   19:     char str[10];
+   20:     UINT8 i;
+   21:     
+   22:     str[0] = '\0';
+  0005 95       [2]             TSX   
+  0006 7f       [4]             CLR   ,X
+   23:     
+   24:     if (flags & LED_INVERT) {
+  0007 e60a     [3]             LDA   10,X
+  0009 a501     [2]             BIT   #1
+  000b 2704     [3]             BEQ   L11 ;abs = 0011
+   25:        u16value ^= 0xFFFF;
+  000d 6310     [5]             COM   16,X
+  000f 630f     [5]             COM   15,X
+  0011          L11:    
+   26:     }
+   27:     
+   28:     switch (u8mode) {
+  0011 e611     [3]             LDA   17,X
+  0013 a104     [2]             CMP   #4
+  0015 2303     [3]             BLS   L1A ;abs = 001a
+  0017 cc015a   [4]             JMP   L15A ;abs = 015a
+  001a          L1A:    
+  001a a102     [2]             CMP   #2
+  001c 2409     [3]             BCC   L27 ;abs = 0027
+  001e 4d       [1]             TSTA  
+  001f 270e     [3]             BEQ   L2F ;abs = 002f
+  0021 410132   [4]             CBEQA #1,L56 ;abs = 0056
+  0024 cc015a   [4]             JMP   L15A ;abs = 015a
+  0027          L27:    
+  0027 2744     [3]             BEQ   L6D ;abs = 006d
+  0029 41046d   [4]             CBEQA #4,L99 ;abs = 0099
+  002c cc015a   [4]             JMP   L15A ;abs = 015a
+  002f          L2F:    
+   29:        case LED_BINARY_MODE:
+   30:           setLed((UINT8)(1 << (u16value % LED_COUNT)), flags);
+  002f e610     [3]             LDA   16,X
+  0031 a403     [2]             AND   #3
+  0033 97       [1]             TAX   
+  0034 a601     [2]             LDA   #1
+  0036 5d       [1]             TSTX  
+  0037 2703     [3]             BEQ   L3C ;abs = 003c
+  0039          L39:    
+  0039 48       [1]             LSLA  
+  003a 5bfd     [4]             DBNZX L39 ;abs = 0039
+  003c          L3C:    
+  003c 97       [1]             TAX   
+  003d 9ee60b   [4]             LDA   11,SP
+  0040 cd0000   [6]             JSR   setLed
+   31:           
+   32:           if (u16ledDelay != 0) {
+  0043 9efe0c   [5]             LDHX  12,SP
+  0046 2603     [3]             BNE   L4B ;abs = 004b
+  0048 cc015a   [4]             JMP   L15A ;abs = 015a
+  004b          L4B:    
+   33:              delay(u16ledDelay);
+  004b cd0000   [6]             JSR   delay
+   34:              setLed(0, LED_NO_FLAGS);
+  004e 5f       [1]             CLRX  
+  004f 4f       [1]             CLRA  
+  0050 cd0000   [6]             JSR   setLed
+  0053 cc015a   [4]             JMP   L15A ;abs = 015a
+  0056          L56:    
+   35:           }   
+   36:           break;
+   37:           
+   38:        case LED_HEX_MODE:      
+   39:           setLed((UINT8) u16value, flags);
+  0056 ee10     [3]             LDX   16,X
+  0058 9ee60b   [4]             LDA   11,SP
+  005b cd0000   [6]             JSR   setLed
+   40:           if (u16ledDelay != 0) {
+  005e 9efe0c   [5]             LDHX  12,SP
+  0061 272d     [3]             BEQ   L90 ;abs = 0090
+   41:              delay(u16ledDelay);
+  0063 cd0000   [6]             JSR   delay
+   42:              setLed(0, LED_NO_FLAGS);
+  0066 5f       [1]             CLRX  
+  0067 4f       [1]             CLRA  
+  0068 cd0000   [6]             JSR   setLed
+  006b 2023     [3]             BRA   L90 ;abs = 0090
+  006d          L6D:    
+   43:           } 
+   44:           delay(u16ledDelay);        
+   45:           break;
+   46:           
+   47:        case LED_COUNT_MODE:
+   48:           for (i = 0; i<u16value; i++) {
+  006d 5f       [1]             CLRX  
+  006e 201a     [3]             BRA   L8A ;abs = 008a
+  0070          L70:    
+   49:              LED1 = LED_OFF;
+  0070 1800     [5]             BSET  4,_PTDD
+   50:              delay(u16ledDelay);
+  0072 89       [2]             PSHX  
+  0073 9efe0d   [5]             LDHX  13,SP
+  0076 89       [2]             PSHX  
+  0077 8b       [2]             PSHH  
+  0078 cd0000   [6]             JSR   delay
+   51:              LED1 = LED_ON;
+  007b 1900     [5]             BCLR  4,_PTDD
+   52:              delay(u16ledDelay);
+  007d 9efe01   [5]             LDHX  1,SP
+  0080 cd0000   [6]             JSR   delay
+  0083 9ee603   [4]             LDA   3,SP
+  0086 4c       [1]             INCA  
+  0087 97       [1]             TAX   
+  0088 a703     [2]             AIS   #3
+  008a          L8A:    
+  008a 8c       [1]             CLRH  
+  008b 9ef310   [6]             CPHX  16,SP
+  008e 25e0     [3]             BCS   L70 ;abs = 0070
+  0090          L90:    
+   53:           }
+   54:           delay(u16ledDelay);
+  0090 9efe0c   [5]             LDHX  12,SP
+  0093 cd0000   [6]             JSR   delay
+  0096 cc015a   [4]             JMP   L15A ;abs = 015a
+  0099          L99:    
+   55:           break;
+   56:           
+   57:        case LED_DIGIT_MODE:      
+   58:              int2string((UINT32) u16value, str);
+  0099 9efe10   [5]             LDHX  16,SP
+  009c 89       [2]             PSHX  
+  009d 8b       [2]             PSHH  
+  009e 4f       [1]             CLRA  
+  009f 87       [2]             PSHA  
+  00a0 87       [2]             PSHA  
+  00a1 95       [2]             TSX   
+  00a2 af04     [2]             AIX   #4
+  00a4 cd0000   [6]             JSR   int2string
+  00a7 a704     [2]             AIS   #4
+   59:  			   trimWhiteSpace(str);
+  00a9 95       [2]             TSX   
+  00aa cd0000   [6]             JSR   trimWhiteSpace
+   60:        
+   61:              for (i=0; i<strlen(str); i++) {
+  00ad 4f       [1]             CLRA  
+  00ae cc0143   [4]             JMP   L143 ;abs = 0143
+  00b1          LB1:    
+   62:  		         switch (str[i]) {
+  00b1 95       [2]             TSX   
+  00b2 87       [2]             PSHA  
+  00b3 9f       [1]             TXA   
+  00b4 9eeb01   [4]             ADD   1,SP
+  00b7 87       [2]             PSHA  
+  00b8 8b       [2]             PSHH  
+  00b9 86       [3]             PULA  
+  00ba a900     [2]             ADC   #0
+  00bc 87       [2]             PSHA  
+  00bd 8a       [3]             PULH  
+  00be 88       [3]             PULX  
+  00bf fe       [3]             LDX   ,X
+  00c0 a339     [2]             CPX   #57
+  00c2 cd0000   [6]             JSR   _PUSH_CC
+  00c5 9ee605   [4]             LDA   5,SP
+  00c8 cd0000   [6]             JSR   _POP_CC
+  00cb a701     [2]             AIS   #1
+  00cd 2260     [3]             BHI   L12F ;abs = 012f
+  00cf a335     [2]             CPX   #53
+  00d1 2418     [3]             BCC   LEB ;abs = 00eb
+  00d3 a333     [2]             CPX   #51
+  00d5 240c     [3]             BCC   LE3 ;abs = 00e3
+  00d7 513029   [4]             CBEQX #48,L103 ;abs = 0103
+  00da 51312a   [4]             CBEQX #49,L107 ;abs = 0107
+  00dd a332     [2]             CPX   #50
+  00df 264e     [3]             BNE   L12F ;abs = 012f
+  00e1 2028     [3]             BRA   L10B ;abs = 010b
+  00e3          LE3:    
+  00e3 272a     [3]             BEQ   L10F ;abs = 010f
+  00e5 a334     [2]             CPX   #52
+  00e7 2646     [3]             BNE   L12F ;abs = 012f
+  00e9 2028     [3]             BRA   L113 ;abs = 0113
+  00eb          LEB:    
+  00eb a338     [2]             CPX   #56
+  00ed 240c     [3]             BCC   LFB ;abs = 00fb
+  00ef 513525   [4]             CBEQX #53,L117 ;abs = 0117
+  00f2 513626   [4]             CBEQX #54,L11B ;abs = 011b
+  00f5 a337     [2]             CPX   #55
+  00f7 2636     [3]             BNE   L12F ;abs = 012f
+  00f9 2024     [3]             BRA   L11F ;abs = 011f
+  00fb          LFB:    
+  00fb 2726     [3]             BEQ   L123 ;abs = 0123
+  00fd a339     [2]             CPX   #57
+  00ff 262e     [3]             BNE   L12F ;abs = 012f
+  0101 2024     [3]             BRA   L127 ;abs = 0127
+  0103          L103:   
+   63:  		              case '0':
+   64:  		                  setLed(0x0F, LED_NO_FLAGS);
+  0103 ae0f     [2]             LDX   #15
+   65:  		                  break;
+  0105 2022     [3]             BRA   L129 ;abs = 0129
+  0107          L107:   
+   66:  		              case '1':
+   67:  		                  setLed(0x01, LED_NO_FLAGS);
+  0107 ae01     [2]             LDX   #1
+   68:  		                  break;
+  0109 201e     [3]             BRA   L129 ;abs = 0129
+  010b          L10B:   
+   69:  		              case '2':
+   70:  		                  setLed(0x02, LED_NO_FLAGS);		                  
+  010b ae02     [2]             LDX   #2
+   71:  		                  break;
+  010d 201a     [3]             BRA   L129 ;abs = 0129
+  010f          L10F:   
+   72:  		              case '3':
+   73:  		                  setLed(0x03, LED_NO_FLAGS);
+  010f ae03     [2]             LDX   #3
+   74:  		                  break;
+  0111 2016     [3]             BRA   L129 ;abs = 0129
+  0113          L113:   
+   75:  		              case '4':
+   76:  		                  setLed(0x04, LED_NO_FLAGS);
+  0113 ae04     [2]             LDX   #4
+   77:  		                  break;
+  0115 2012     [3]             BRA   L129 ;abs = 0129
+  0117          L117:   
+   78:  		              case '5':
+   79:  		                  setLed(0x05, LED_NO_FLAGS);
+  0117 ae05     [2]             LDX   #5
+   80:  		                  break;
+  0119 200e     [3]             BRA   L129 ;abs = 0129
+  011b          L11B:   
+   81:  		              case '6':
+   82:  		                  setLed(0x06, LED_NO_FLAGS);
+  011b ae06     [2]             LDX   #6
+   83:  		                  break;
+  011d 200a     [3]             BRA   L129 ;abs = 0129
+  011f          L11F:   
+   84:  		              case '7':
+   85:  		                  setLed(0x07, LED_NO_FLAGS);
+  011f ae07     [2]             LDX   #7
+   86:  		                  break;
+  0121 2006     [3]             BRA   L129 ;abs = 0129
+  0123          L123:   
+   87:  		              case '8':
+   88:  		                  setLed(0x08, LED_NO_FLAGS);
+  0123 ae08     [2]             LDX   #8
+   89:  		                  break;   
+  0125 2002     [3]             BRA   L129 ;abs = 0129
+  0127          L127:   
+   90:  		              case '9':
+   91:  		                  setLed(0x09, LED_NO_FLAGS);
+  0127 ae09     [2]             LDX   #9
+  0129          L129:   
+  0129 87       [2]             PSHA  
+  012a 4f       [1]             CLRA  
+  012b cd0000   [6]             JSR   setLed
+   92:  		                  break;   
+  012e 86       [3]             PULA  
+  012f          L12F:   
+   93:  		              
+   94:  		              default:
+   95:  		               break;     
+   96:  		         }
+   97:  		         delay(u16ledDelay);
+  012f 9efe0c   [5]             LDHX  12,SP
+  0132 87       [2]             PSHA  
+  0133 cd0000   [6]             JSR   delay
+   98:  		         setLed(0, LED_NO_FLAGS);
+  0136 5f       [1]             CLRX  
+  0137 4f       [1]             CLRA  
+  0138 cd0000   [6]             JSR   setLed
+   99:  		         delay(u16ledDelay);   
+  013b 9efe0d   [5]             LDHX  13,SP
+  013e cd0000   [6]             JSR   delay
+  0141 86       [3]             PULA  
+  0142 4c       [1]             INCA  
+  0143          L143:   
+  0143 95       [2]             TSX   
+  0144 87       [2]             PSHA  
+  0145 cd0000   [6]             JSR   strlen
+  0148 9f       [1]             TXA   
+  0149 87       [2]             PSHA  
+  014a 8b       [2]             PSHH  
+  014b 95       [2]             TSX   
+  014c e602     [3]             LDA   2,X
+  014e e001     [3]             SUB   1,X
+  0150 4f       [1]             CLRA  
+  0151 f2       [3]             SBC   ,X
+  0152 a702     [2]             AIS   #2
+  0154 86       [3]             PULA  
+  0155 2403     [3]             BCC   L15A ;abs = 015a
+  0157 cc00b1   [4]             JMP   LB1 ;abs = 00b1
+  015a          L15A:   
+  100:              }
+  101:           break;
+  102:     }
+  103:  }
+  015a a70d     [2]             AIS   #13
+  015c 81       [6]             RTS   
+  104:  
+  105:  /**************************************************************
+  106:  *    Function:     setLed()
+  107:  *    Parameters: UINT8 value, UINT8 flags
+  108:  *    Return: none
+  109:  *
+  110:  *     value = 1 - lights LED4
+  111:  *     value = 3 -> Lights LED3,4
+  112:  *
+  113:  *     flags bit 0 invert bit.
+  114:  ***************************************************************/
+  115:  
+  116:  void setLed(UINT8 u8value, UINT8 flags) {
+  117:  
+  118:     if (flags & 0x01) {
+  0000 a501     [2]             BIT   #1
+  0002 9f       [1]             TXA   
+  0003 2702     [3]             BEQ   L7 ;abs = 0007
+  119:        u8value ^= 1;   /* invert the values */
+  0005 a801     [2]             EOR   #1
+  0007          L7:     
+  120:     }
+  121:  
+  122:     switch (u8value % 16) {
+  0007 a40f     [2]             AND   #15
+  0009 a10f     [2]             CMP   #15
+  000b 2303     [3]             BLS   L10 ;abs = 0010
+  000d cc00c7   [4]             JMP   LC7 ;abs = 00c7
+  0010          L10:    
+  0010 a108     [2]             CMP   #8
+  0012 242e     [3]             BCC   L42 ;abs = 0042
+  0014 a104     [2]             CMP   #4
+  0016 2415     [3]             BCC   L2D ;abs = 002d
+  0018 a102     [2]             CMP   #2
+  001a 2409     [3]             BCC   L25 ;abs = 0025
+  001c 4d       [1]             TSTA  
+  001d 274e     [3]             BEQ   L6D ;abs = 006d
+  001f 41014f   [4]             CBEQA #1,L71 ;abs = 0071
+  0022 cc00c7   [4]             JMP   LC7 ;abs = 00c7
+  0025          L25:    
+  0025 274e     [3]             BEQ   L75 ;abs = 0075
+  0027 41034f   [4]             CBEQA #3,L79 ;abs = 0079
+  002a cc00c7   [4]             JMP   LC7 ;abs = 00c7
+  002d          L2D:    
+  002d a106     [2]             CMP   #6
+  002f 2409     [3]             BCC   L3A ;abs = 003a
+  0031 410449   [4]             CBEQA #4,L7D ;abs = 007d
+  0034 41054a   [4]             CBEQA #5,L81 ;abs = 0081
+  0037 cc00c7   [4]             JMP   LC7 ;abs = 00c7
+  003a          L3A:    
+  003a 2749     [3]             BEQ   L85 ;abs = 0085
+  003c 41074a   [4]             CBEQA #7,L89 ;abs = 0089
+  003f cc00c7   [4]             JMP   LC7 ;abs = 00c7
+  0042          L42:    
+  0042 a10c     [2]             CMP   #12
+  0044 2413     [3]             BCC   L59 ;abs = 0059
+  0046 a10a     [2]             CMP   #10
+  0048 2408     [3]             BCC   L52 ;abs = 0052
+  004a 410840   [4]             CBEQA #8,L8D ;abs = 008d
+  004d 410943   [4]             CBEQA #9,L93 ;abs = 0093
+  0050 2075     [3]             BRA   LC7 ;abs = 00c7
+  0052          L52:    
+  0052 2745     [3]             BEQ   L99 ;abs = 0099
+  0054 410b48   [4]             CBEQA #11,L9F ;abs = 009f
+  0057 206e     [3]             BRA   LC7 ;abs = 00c7
+  0059          L59:    
+  0059 a10e     [2]             CMP   #14
+  005b 2408     [3]             BCC   L65 ;abs = 0065
+  005d 410c45   [4]             CBEQA #12,LA5 ;abs = 00a5
+  0060 410d4a   [4]             CBEQA #13,LAD ;abs = 00ad
+  0063 2062     [3]             BRA   LC7 ;abs = 00c7
+  0065          L65:    
+  0065 274e     [3]             BEQ   LB5 ;abs = 00b5
+  0067 a10f     [2]             CMP   #15
+  0069 265c     [3]             BNE   LC7 ;abs = 00c7
+  006b 2052     [3]             BRA   LBF ;abs = 00bf
+  006d          L6D:    
+  123:              case 0:
+  124:                 LED1 = LED_OFF; LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_OFF;
+  006d 1800     [5]             BSET  4,_PTDD
+  125:                 break;               
+  006f 201e     [3]             BRA   L8F ;abs = 008f
+  0071          L71:    
+  126:              case 1:
+  127:                 LED1 = LED_OFF; LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_ON;
+  0071 1800     [5]             BSET  4,_PTDD
+  128:                 break;               
+  0073 2020     [3]             BRA   L95 ;abs = 0095
+  0075          L75:    
+  129:              case 2:
+  130:                 LED1 = LED_OFF; LED2 = LED_OFF; LED3 = LED_ON; LED4 = LED_OFF;
+  0075 1800     [5]             BSET  4,_PTDD
+  131:                 break;
+  0077 2022     [3]             BRA   L9B ;abs = 009b
+  0079          L79:    
+  132:              case 3:
+  133:                 LED1 = LED_OFF; LED2 = LED_OFF; LED3 = LED_ON; LED4 = LED_ON;
+  0079 1800     [5]             BSET  4,_PTDD
+  134:                 break;
+  007b 2024     [3]             BRA   LA1 ;abs = 00a1
+  007d          L7D:    
+  135:              case 4:
+  136:                 LED1 = LED_OFF; LED2 = LED_ON; LED3 = LED_OFF; LED4 = LED_OFF;
+  007d 1800     [5]             BSET  4,_PTDD
+  137:                 break;
+  007f 2026     [3]             BRA   LA7 ;abs = 00a7
+  0081          L81:    
+  138:              case 5:
+  139:                 LED1 = LED_OFF; LED2 = LED_ON; LED3 = LED_OFF; LED4 = LED_ON;
+  0081 1800     [5]             BSET  4,_PTDD
+  140:                 break;
+  0083 202a     [3]             BRA   LAF ;abs = 00af
+  0085          L85:    
+  141:              case 6:
+  142:                 LED1 = LED_OFF; LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_OFF;
+  0085 1800     [5]             BSET  4,_PTDD
+  143:                 break;
+  0087 202e     [3]             BRA   LB7 ;abs = 00b7
+  0089          L89:    
+  144:              case 7:
+  145:                 LED1 = LED_OFF; LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_ON;
+  0089 1800     [5]             BSET  4,_PTDD
+  146:                 break;
+  008b 2034     [3]             BRA   LC1 ;abs = 00c1
+  008d          L8D:    
+  147:              case 8:
+  148:                 LED1 = LED_ON; LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_OFF;
+  008d 1900     [5]             BCLR  4,_PTDD
+  008f          L8F:    
+  008f 1a00     [5]             BSET  5,_PTDD
+  0091 2016     [3]             BRA   LA9 ;abs = 00a9
+  0093          L93:    
+  149:                 break;
+  150:              case 9:
+  151:                 LED1 = LED_ON; LED2 = LED_OFF; LED3 = LED_OFF; LED4 = LED_ON;
+  0093 1900     [5]             BCLR  4,_PTDD
+  0095          L95:    
+  0095 1a00     [5]             BSET  5,_PTDD
+  0097 2018     [3]             BRA   LB1 ;abs = 00b1
+  0099          L99:    
+  152:                 break;
+  153:              case 10:
+  154:                 LED1 = LED_ON; LED2 = LED_OFF; LED3 = LED_ON; LED4 = LED_OFF;
+  0099 1900     [5]             BCLR  4,_PTDD
+  009b          L9B:    
+  009b 1a00     [5]             BSET  5,_PTDD
+  009d 201a     [3]             BRA   LB9 ;abs = 00b9
+  009f          L9F:    
+  155:                 break;
+  156:              case 11:
+  157:                 LED1 = LED_ON; LED2 = LED_OFF; LED3 = LED_ON; LED4 = LED_ON;
+  009f 1900     [5]             BCLR  4,_PTDD
+  00a1          LA1:    
+  00a1 1a00     [5]             BSET  5,_PTDD
+  00a3 201e     [3]             BRA   LC3 ;abs = 00c3
+  00a5          LA5:    
+  158:                 break;
+  159:              case 12:
+  160:                 LED1 = LED_ON; LED2 = LED_ON; LED3 = LED_OFF; LED4 = LED_OFF;
+  00a5 1900     [5]             BCLR  4,_PTDD
+  00a7          LA7:    
+  00a7 1b00     [5]             BCLR  5,_PTDD
+  00a9          LA9:    
+  00a9 1c00     [5]             BSET  6,_PTDD
+  00ab 200e     [3]             BRA   LBB ;abs = 00bb
+  00ad          LAD:    
+  161:                 break;
+  162:              case 13:
+  163:                 LED1 = LED_ON; LED2 = LED_ON; LED3 = LED_OFF; LED4 = LED_ON;
+  00ad 1900     [5]             BCLR  4,_PTDD
+  00af          LAF:    
+  00af 1b00     [5]             BCLR  5,_PTDD
+  00b1          LB1:    
+  00b1 1c00     [5]             BSET  6,_PTDD
+  00b3 2010     [3]             BRA   LC5 ;abs = 00c5
+  00b5          LB5:    
+  164:                 break;
+  165:              case 14:
+  166:                 LED1 = LED_ON; LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_OFF;
+  00b5 1900     [5]             BCLR  4,_PTDD
+  00b7          LB7:    
+  00b7 1b00     [5]             BCLR  5,_PTDD
+  00b9          LB9:    
+  00b9 1d00     [5]             BCLR  6,_PTDD
+  00bb          LBB:    
+  00bb 1e00     [5]             BSET  7,_PTDD
+  00bd 2008     [3]             BRA   LC7 ;abs = 00c7
+  00bf          LBF:    
+  167:                 break;
+  168:              case 15:
+  169:                 LED1 = LED_ON; LED2 = LED_ON; LED3 = LED_ON; LED4 = LED_ON;
+  00bf 1900     [5]             BCLR  4,_PTDD
+  00c1          LC1:    
+  00c1 1b00     [5]             BCLR  5,_PTDD
+  00c3          LC3:    
+  00c3 1d00     [5]             BCLR  6,_PTDD
+  00c5          LC5:    
+  00c5 1f00     [5]             BCLR  7,_PTDD
+  00c7          LC7:    
+  170:                 break;
+  171:     }
+  172:     
+  173:  }
+  00c7 81       [6]             RTS   
+  174:  
