@@ -1,0 +1,122 @@
+ANSI-C/cC++ Compiler for HC08 V-5.0.24 Build 7134, May 15 2007
+
+    1:  #include "timer.h"
+    2:  #include "eventDefs.h"
+    3:  
+    4:  /* Globals */
+    5:  UINT16 gu16msTimer = 0;
+    6:  UINT16 gu16timerEvent[2];
+    7:  extern UINT16 gu16Events;
+    8:  
+    9:  interrupt void IRQTimer1(void) {
+  0000 8b       [2]             PSHH  
+   10:  
+   11:     gu16msTimer++;
+  0001 450000   [3]             LDHX  @gu16msTimer
+  0004 6c01     [5]             INC   1,X
+  0006 2601     [3]             BNE   L9 ;abs = 0009
+  0008 7c       [4]             INC   ,X
+  0009          L9:     
+   12:     if (gu16timerEvent[0] != 0) {
+  0009 320000   [5]             LDHX  gu16timerEvent
+  000c 2714     [3]             BEQ   L22 ;abs = 0022
+   13:        if(gu16timerEvent[0] == gu16msTimer) {
+  000e 320000   [5]             LDHX  gu16msTimer
+  0011 3e0000   [6]             CPHX  gu16timerEvent
+  0014 260c     [3]             BNE   L22 ;abs = 0022
+   14:           gu16Events |= TIMER_EVENT0;
+  0016 450001   [3]             LDHX  @gu16Events:1
+  0019 f6       [3]             LDA   ,X
+  001a aa02     [2]             ORA   #2
+  001c f7       [2]             STA   ,X
+   15:           gu16timerEvent[0] = 0; /* Turn off the timer0 */
+  001d 5f       [1]             CLRX  
+  001e 8c       [1]             CLRH  
+  001f 960000   [5]             STHX  gu16timerEvent
+  0022          L22:    
+   16:        }
+   17:     }
+   18:     
+   19:     if (gu16timerEvent[1] != 0) {
+  0022 320002   [5]             LDHX  gu16timerEvent:2
+  0025 2714     [3]             BEQ   L3B ;abs = 003b
+   20:        if(gu16timerEvent[1] == gu16msTimer) {
+  0027 320000   [5]             LDHX  gu16msTimer
+  002a 3e0002   [6]             CPHX  gu16timerEvent:2
+  002d 260c     [3]             BNE   L3B ;abs = 003b
+   21:           gu16Events |= TIMER_EVENT1;
+  002f 450001   [3]             LDHX  @gu16Events:1
+  0032 f6       [3]             LDA   ,X
+  0033 aa04     [2]             ORA   #4
+  0035 f7       [2]             STA   ,X
+   22:           gu16timerEvent[1] = 0; /* Turn off the timer1 */
+  0036 5f       [1]             CLRX  
+  0037 8c       [1]             CLRH  
+  0038 960002   [5]             STHX  gu16timerEvent:2
+  003b          L3B:    
+   23:        }
+   24:     }   
+   25:     
+   26:     TPM1SC &= ~0x80;  /* clear the interrupt */
+  003b 1f00     [5]             BCLR  7,_TPM1SC
+   27:  }
+  003d 8a       [3]             PULH  
+  003e 80       [9]             RTI   
+   28:  
+   29:  /**************************************************************
+   30:  *    Function:     delay
+   31:  *    Parameters: 16-bit delay value
+   32:  *    Return:        none
+   33:  *
+   34:  *    Simple blocking delay loop using HW timer.
+   35:  **************************************************************/
+   36:  
+   37:   
+   38:  void delaySymbols(UINT16 count) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+  0002 a7fe     [2]             AIS   #-2
+   39:    UINT16 u16Match;
+   40:    
+   41:    u16Match = gu16msTimer + count;
+  0004 c60001   [4]             LDA   gu16msTimer:1
+  0007 95       [2]             TSX   
+  0008 eb03     [3]             ADD   3,X
+  000a 87       [2]             PSHA  
+  000b c60000   [4]             LDA   gu16msTimer
+  000e e902     [3]             ADC   2,X
+  0010 87       [2]             PSHA  
+  0011 8a       [3]             PULH  
+  0012 88       [3]             PULX  
+  0013 9eff01   [5]             STHX  1,SP
+  0016          L16:    
+   42:    while (gu16msTimer != u16Match);
+  0016 320000   [5]             LDHX  gu16msTimer
+  0019 9ef301   [6]             CPHX  1,SP
+  001c 26f8     [3]             BNE   L16 ;abs = 0016
+   43:  }
+  001e a704     [2]             AIS   #4
+  0020 81       [6]             RTS   
+   44:  
+   45:  void delaySeconds(UINT16 count) {
+  0000 89       [2]             PSHX  
+  0001 8b       [2]             PSHH  
+   46:    delaySymbols(count*100);
+  0002 ae64     [2]             LDX   #100
+  0004 8c       [1]             CLRH  
+  0005 89       [2]             PSHX  
+  0006 8b       [2]             PSHH  
+  0007 9efe03   [5]             LDHX  3,SP
+  000a cd0000   [6]             JSR   _IMUL_STAR08
+  000d a702     [2]             AIS   #2
+  000f ad00     [5]             BSR   delaySymbols
+   47:  }
+  0011 a702     [2]             AIS   #2
+  0013 81       [6]             RTS   
+   48:  
+   49:  void delay(UINT16 count) {
+   50:    delaySymbols(count);
+  0000 2000     [3]             BRA   delaySymbols
+   51:  }
+   52:  
+   53:  
