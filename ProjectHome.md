@@ -1,0 +1,1 @@
+An implementation for test the performance of elements using Zigbee protocol. We will make a coordenator and a endpoint code. The test will use PDUs with random size and, after sniffer the network, we will generate graphics about the performance of these elements.
